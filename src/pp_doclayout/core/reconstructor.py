@@ -4,9 +4,26 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ..policies.translation_policy import should_translate
+from .batch_processor import BatchProcessor
 
 if TYPE_CHECKING:
     from ..translators.base import BaseTranslator
+
+
+class _CachedTranslator:
+    """Wrapper that caches translations for batch mode."""
+    
+    def __init__(self, translator: "BaseTranslator", cache: dict):
+        self.translator = translator
+        self.cache = cache
+    
+    def translate(self, text: str) -> str:
+        if text in self.cache:
+            return self.cache[text]
+        result = self.translator.translate(text)
+        self.cache[text] = result
+        return result
+
 
 LABEL_TO_TAG = {
     "doc_title": "h1",
