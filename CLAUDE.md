@@ -3,66 +3,77 @@
 ## 📋 Tổng quan dự án
 Pipeline dịch thuật tài liệu học thuật sang tiếng Việt với quy trình khép kín:
 1. **Parse PDF** (Layout Analysis + OCR) → JSON + images
-2. **Translate** (Gemma hoặc HY-MT) → Vietnamese
+2. **Translate** (Gemma) → Vietnamese
 3. **Reconstruct** → HTML với MathJax
 
 ## 🏗 Cấu trúc codebase hiện tại
 
-### Scripts cũ (legacy, vẫn hoạt động)
+### Scripts cũ (đã có, vẫn hoạt động)
 ```
-main.py                  - Parse PDF bằng PaddleOCR-VL
-reconstruct_gemma.py     - Dịch + HTML với Gemma model
-reconstruct_multi.py     - Dịch + HTML với HY-MT model
-translator_engine.py     - Old translator wrapper (đã thay thế)
-translator_engine_gemma.py - Old translator wrapper (đã thay thế)
+main.py                  - Parse PDF bằng PaddleOCR-VL (hardcoded paths)
+reconstruct_gemma.py     - Dịch + HTML với Gemma model (old style)
+reconstruct_multi.py     - Dịch + HTML với HY-MT model (old style)
+translator_engine.py     - Old translator wrapper (Tencent HY-MT)
+translator_engine_gemma.py - Old translator wrapper (Gemma)
 base.py                  - Base class từ PaddleX
 paddleocr_vl.py          - Wrapper PaddleOCR-VL
+server_manager.py        - Quản lý 2 servers với model switching
+demo_app.py             - Streamlit demo app
+start_server.sh          - Script khởi động 2 servers
 ```
 
-### Source code chính (src/pp_doclayout/) - Architecture mới ✅
+### Source code chính (src/pp_doclayout/) - Architecture mới (đã refactor)
 ```
-__init__.py              - Version info
+__init__.py              - Version 0.1.0
 cli.py                   - Typer CLI với 3 commands: parse, translate, run
-config.py                - Configuration (pydantic-settings) ✅
+config.py                - Configuration (Pydantic Settings) ✅
 types.py                 - Type definitions (TypedDict) ✅
 
 utils/                   # Utility functions ✅
   ├─ __init__.py
-  ├─ file_utils.py       # find_image_file(), ensure_dir()
-  └─ path_utils.py       # get_output_dir(), get_project_dir()
+  ├─ file_utils.py        - find_image_file(), ensure_dir()
+  └─ path_utils.py        - get_output_dir(), get_project_dir()
 
 templates/               # Jinja2 HTML templates ✅
-  ├─ base.html           # Base HTML template
-  ├─ page.html           # Page template
-  ├─ styles.html         # CSS styles
-  └─ mathjax_config.html # MathJax configuration
+  ├─ base.html           - Base HTML structure
+  ├─ page.html           - Single page template
+  ├─ styles.html         - CSS styles
+  └─ mathjax_config.html - MathJax config
 
 policies/
-  └─ translation_policy.py - Logic dịch/giữ/skip blocks
-
-translators/
   ├─ __init__.py
-  ├─ base.py             - Abstract Base Translator
-  └─ gemma.py            - Google TranslateGemma (có translate_batch) ✅
+  └─ translation_policy.py - Logic dịch/giữ/skip blocks ✅
 
 exporters/               # Export handlers ✅
   ├─ __init__.py
-  ├─ base.py             # BaseExporter (abstract)
-  └─ html.py             # HTMLExporter với Jinja2
+  ├─ base.py             - Abstract Base Exporter
+  └─ html.py            - HTMLExporter với Jinja2
 
-core/
+translators/             # Translator implementations ✅
   ├─ __init__.py
-  ├─ reconstructor.py    # HTML rendering & reconstruction logic
-  └─ batch_processor.py  # Batch processing for translation ✅
+  ├─ base.py             - Abstract Base Translator
+  └─ gemma.py            - Google TranslateGemma (với translate_batch())
+
+core/                    # Core business logic
+  ├─ __init__.py         - Export process_project, BatchProcessor
+  ├─ batch_processor.py   - Batch processing logic ✅
+  └─ reconstructor.py    - HTML rendering & reconstruction (old style)
 ```
 
-### Tests (tests/) ✅
+### Tests ✅
 ```
-test_config.py           # Tests for config.py
-test_types.py            # Tests for types module
-test_utils.py            # Tests for utils module
-test_batch_processor.py  # Tests for batch_processor
-test_exporters.py        # Tests for exporters
+tests/
+  ├─ test_config.py
+  ├─ test_types.py
+  ├─ test_utils.py
+  ├─ test_batch_processor.py
+  └─ test_exporters.py
+```
+
+### File cấu hình ✅
+```
+pyproject.toml            - Project metadata (version 0.1.0)
+.env.example              - Environment variables mẫu
 ```
 
 ## 🚀 Cách sử dụng
@@ -89,6 +100,27 @@ uv run reconstruct_gemma.py <project_dir>
 
 # Step 2b: Dịch với HY-MT
 uv run reconstruct_multi.py <project_dir>
+```
+
+### Server Manager CLI
+```bash
+# Quản lý servers
+python server_manager.py start-paddle    # Start PaddleOCR-VL
+python server_manager.py start-gemma     # Start Gemma
+python server_manager.py stop-paddle     # Stop PaddleOCR-VL
+python server_manager.py stop-gemma      # Stop Gemma
+python server_manager.py stop-all        # Stop cả 2
+python server_manager.py switch paddle   # Switch sang PaddleOCR-VL
+python server_manager.py switch gemma    # Switch sang Gemma
+python server_manager.py status         # Xem status
+
+# Tự động switch model khi chạy full pipeline
+# (CLI tự động switch server khi cần)
+```
+
+### Streamlit Demo App
+```bash
+uv run streamlit run demo_app.py
 ```
 
 ## 🖥 Servers cần chạy
@@ -135,39 +167,45 @@ curl http://127.0.0.1:8000/v1/models    # PaddleOCR
 ## ⚙ Cấu hình (src/pp_doclayout/config.py)
 
 ```python
-# Engine
+# Engine Settings
 engine: str = "gemma"
 
-# vLLM/Gemma Server
+# vLLM/Gemma Server Settings
 vllm_base_url: str = "http://127.0.0.1:8001/v1"
 vllm_max_tokens: int = 16384
 vllm_model_name: str = "Infomaniak-AI/vllm-translategemma-4b-it"
 
-# PaddleOCR-VL Server
+# PaddleOCR-VL Server Settings
 paddle_ocr_server_url: str = "http://127.0.0.1:8000/v1"
 paddle_ocr_backend: str = "vllm-server"
 
-# Batch Processing
-batch_size_small: int = 16    # <100 tokens
-batch_size_medium: int = 8    # 100-500 tokens
-batch_size_large: int = 4     # >500 tokens
+# Batch Processing Settings
+batch_size_small: int = 16   # < 100 tokens
+batch_size_medium: int = 8   # 100-500 tokens
+batch_size_large: int = 4    # > 500 tokens
 
-# Paths
+# Path Settings
 output_dir: str = "output"
 
-# Export
-export_formats_raw: str = "html,pdf"  # comma-separated
+# Export Settings
+export_formats: list[str] = ["html", "pdf"]
 ```
 
-Có thể thay đổi qua env vars với prefix `PPDOCLAYOUT_` hoặc `.env` file.
+Có thể thay đổi qua env vars (prefix `PPDOCLAYOUT_`) hoặc `.env` file.
 
 ## 📝 Translation Policy
 
 | Action | Labels | Mô tả |
 |--------|--------|-------|
 | **translate** | `abstract`, `text`, `figure_title`, `table_caption` | Nội dung chính |
-| **keep** | `doc_title`, `paragraph_title`, `reference_content`, `footnote`, `display_formula`, `table`, `image`, `chart` | Tiêu đề, references, công thức |
-| **skip** | `aside_text`, `header`, `footer`, `number`, `content` | Nhiễu, số trang |
+| **keep** | `doc_title`, `paragraph_title`, `reference_content`, `footnote`, `vision_footnote`, `display_formula`, `table`, `image`, `chart`, `formula_number` | Tiêu đề, references, công thức |
+| **skip** | `aside_text`, `header`, `footer`, `number`, `content`, `paragraph_title` (when "contents") | Nhiễu, số trang, table of contents |
+
+**Special cases:**
+- `paragraph_title` with "contents" → skip
+- `text` < 6 words and no @ → keep
+- `text` contains @ (email) → keep
+- In reference section: `text` → `reference_content` → keep
 
 ## 📦 Dependencies chính
 
@@ -175,31 +213,33 @@ Có thể thay đổi qua env vars với prefix `PPDOCLAYOUT_` hoặc `.env` fil
 - `vllm` - Inference engine
 - `openai` - API client cho vLLM
 - `typer` - CLI framework
-- `pydantic-settings` - Configuration ✅
-- `jinja2` - Templates ✅
-- `tiktoken` - Token estimation ✅
+- `pydantic-settings` - Configuration
+- `jinja2` - Template engine
+- `tiktoken` - Token estimation
 
 Cài đặt:
 ```bash
-uv pip install transformers accelerate bitsandbytes sentencepiece protobuf paddlepaddle-gpu paddleocr paddleocrvl pydantic-settings jinja2 tiktoken
+uv pip install transformers accelerate bitsandbytes sentencepiece protobuf paddlepaddle-gpu paddleocr paddleocrvl jinja2 tiktoken
 ```
 
 ## 📂 Output
 
 Tất cả kết quả lưu trong `output/<pdf_name>/`:
 - JSON files: `*_res.json` - parsing results
+- Markdown: `*_res.md` - parsed markdown
 - Images: `imgs/` - cropped images
 - HTML: `translated_<project_name>.html` - final result
 
 ## 🔍 Status hiện tại
 
-- Git repo: Chưa có commit nào (all files untracked)
-- Python version: 3.10+
+- Git repo: Branch `refactor-1`, 2 commits
+- Python version: 3.12.9
 - Virtual environment: `.venv/` (đã cài dependencies)
+- Refactor Progress: Phase 1 ✅, Phase 2 ✅, Phase 3 ⏸ (templates có nhưng chưa dùng), Phase 4 ⏸ (CLI dùng old style), Phase 5 ⏸ (batch processing refactor)
 
 ---
 
-# 🎯 KẾ HOẠCH REFACTOR
+# 🎯 REFACTOR PROGRESS (Session 2026-02-20)
 
 ## 📌 Config máy của bạn
 ```
@@ -211,79 +251,7 @@ Package Manager: uv 0.8.18
 OS: Linux 6.17.0-14-generic
 ```
 
-## 📋 Vấn đề cần refactor
-
-| Vấn đề | Mô tả | Trạng thái |
-|--------|-------|-----------|
-| Code duplication | `find_image_file()` xuất hiện 3 lần | ✅ Fixed (utils/file_utils.py) |
-| Hardcoded values | Paths, URLs được hardcode | ✅ Fixed (config.py + .env) |
-| File quá lớn | `reconstructor.py` 386 lines | ⏳ Partial (batch_processor extracted) |
-| No templates | HTML render bằng string concatenation | ✅ Fixed (Jinja2 templates) |
-| No tests | Không có unit tests | ✅ Fixed (5 test files) |
-
-## 🎯 Mục tiêu refactor
-
-1. ✅ Tách code thành modules nhỏ, dễ quản lý
-2. ✅ Dùng config file (.env) thay vì hardcode
-3. ✅ Dùng Jinja2 templates cho HTML
-4. ✅ Thêm tests
-5. ⏳ Thêm PDF export (beyond HTML) - pending
-6. ✅ Xử lý song song nhiều projects (BatchProcessor)
-
-## 📁 Cấu trúc hiện tại (đã hoàn thành大部分)
-
-```
-PP_DocLayout/
-├── src/pp_doclayout/
-│   ├── __init__.py
-│   ├── cli.py                   # CLI commands
-│   ├── config.py                # Configuration (Pydantic Settings) ✅
-│   ├── types.py                 # Type definitions ✅
-│   │
-│   ├── utils/                   # Utility functions ✅
-│   │   ├── __init__.py
-│   │   ├── file_utils.py        # find_image_file(), ensure_dir()
-│   │   └── path_utils.py        # get_output_dir(), get_project_dir()
-│   │
-│   ├── templates/               # Jinja2 HTML templates ✅
-│   │   ├── base.html
-│   │   ├── page.html
-│   │   ├── mathjax_config.html
-│   │   └── styles.html
-│   │
-│   ├── policies/
-│   │   └── translation_policy.py
-│   │
-│   ├── exporters/               # Export handlers ✅
-│   │   ├── base.py              # BaseExporter (abstract)
-│   │   ├── html.py              # HTMLExporter
-│   │   └── pdf.py               # TODO: PDFExporter
-│   │
-│   ├── translators/
-│   │   ├── base.py              # BaseTranslator (abstract)
-│   │   └── gemma.py             # GemmaTranslator + translate_batch()
-│   │
-│   └── core/
-│       ├── reconstructor.py     # Main reconstruction logic
-│       └── batch_processor.py   # Batch processing ✅
-│
-├── tests/                       # Unit tests ✅
-│   ├── test_config.py
-│   ├── test_types.py
-│   ├── test_utils.py
-│   ├── test_batch_processor.py
-│   └── test_exporters.py
-│
-├── pyproject.toml
-├── .env.example                 ✅
-└── .env
-```
-
----
-
-## 📊 PROGRESS TRACKING
-
-### ✅ Phase 1: Foundation - Configuration & Utilities (HOÀN THÀNH)
+## ✅ Phase 1: Foundation - Configuration & Utilities (DONE)
 
 | Step | Tên | Trạng thái |
 |------|-----|-----------|
@@ -294,48 +262,65 @@ PP_DocLayout/
 | 5 | Update config.py | ✅ Done |
 | 6 | Test verification | ✅ Done |
 
-### ✅ Phase 2: Refactor Core Logic (HOÀN THÀNH)
+## ✅ Phase 2: Refactor Core Logic (DONE)
 
-| Step | Tên | Trạng thái |
-|------|-----|-----------|
-| 1 | Tạo BatchProcessor | ✅ Done |
-| 2 | Update GemmaTranslator.translate_batch() | ✅ Done |
+| Item | Trạng thái |
+|------|-----------|
+| BatchProcessor | ✅ Done |
+| GemmaTranslator.translate_batch() | ✅ Done (incorrect implementation) |
+| Translation Policy | ✅ Done |
+| Utils (file_utils, path_utils) | ✅ Done |
 
-### ✅ Phase 3: Templates & Exporters (HOÀN THÀNH)
+## 🔵 Phase 3: Templates & Exporters Integration (PENDING - 9 Tasks Total)
 
-| Step | Tên | Trạng thái |
-|------|-----|-----------|
-| 1 | Tạo Jinja2 templates | ✅ Done |
-| 2 | Tạo BaseExporter | ✅ Done |
-| 3 | Tạo HTMLExporter | ✅ Done |
-| 4 | Tests for exporters | ✅ Done |
+**Tasks:**
+1. Fix duplicate `__all__` in core/__init__.py
+2. Create renderer.py module (build_project_data, translate_page_data, render_page_blocks)
+3. Deprecate process_project() in reconstructor.py
 
-### ⏳ Phase 4: Cleanup & Optimization (PENDING)
+**Completed Items:**
+| Item | Status | Date |
+|------|--------|-------|
+| Templates (base.html, page.html, styles.html, mathjax_config.html) | ✅ Done | 2026-02-20 |
+| HTMLExporter with Jinja2 | ✅ Done | 2026-02-20 |
 
-| Step | Tên | Trạng thái |
-|------|-----|-----------|
-| 1 | Remove HY-MT support (hoặc tách riêng) | ⏳ Pending |
-| 2 | Fix duplicate `__all__` in core/__init__.py | ⏳ Pending |
-| 3 | Integrate HTMLExporter into reconstructor | ⏳ Pending |
-| 4 | Add PDFExporter | ⏳ Pending |
+## 🔵 Phase 4: CLI Integration (PENDING)
 
-### ⏳ Phase 5: CLI Enhancements (PENDING)
+**Tasks:**
+4. Update translate() command use renderer
+5. Update run() command use renderer
+6. Update core/__init__.py exports
 
-| Step | Tên | Trạng thái |
-|------|-----|-----------|
-| 1 | Add --format option to CLI | ⏳ Pending |
-| 2 | Add --batch-size option | ⏳ Pending |
-| 3 | Progress bar for translation | ⏳ Pending |
+**Completed Items:**
+| Item | Status |
+|------|--------|
+| CLI (parse, translate, run commands) | ✅ Done (uses old reconstructor) |
 
-### ⏳ Phase 6: Testing & Documentation (PENDING)
+## 🔵 Phase 5: Batch Processing Rewrite - Concurrent Requests (PENDING)
 
-| Step | Tên | Trạng thái |
-|------|-----|-----------|
-| 1 | Integration tests | ⏳ Pending |
-| 2 | Update README.md | ⏳ Pending |
-| 3 | Add docstrings | ⏳ Pending |
+**Approach:** ThreadPoolExecutor instead of asyncio (vLLM handles continuous batching automatically)
 
----
+**Tasks:**
+7. Add max_concurrent_requests to config (default: 32)
+8. Update GemmaTranslator.__init__ use config
+9. Rewrite translate_batch() use ThreadPoolExecutor
+
+**Current Issues:**
+- translate_batch() groups all texts into one request (incorrect)
+- Complex response parsing is unreliable
+- Does NOT utilize vLLM's concurrent requests
+- max_tokens * len(non_empty) is too large
+
+## 📝 Vấn đề còn lại
+
+| Vấn đề | Mô tả | Priority | Phase |
+|--------|---------|----------|-------|
+| Duplicate `__all__` in core/__init__.py | Lines 4 & 6 duplicate | LOW | Phase 3 |
+| reconstructor.py uses string concatenation | Not Jinja2 templates | HIGH | Phase 3 |
+| Templates created but not used | base.html, page.html not called | HIGH | Phase 3 |
+| CLI doesn't use HTMLExporter | Still uses process_project() | HIGH | Phase 4 |
+| translate_batch() sends all in 1 request | Should be concurrent requests | HIGH | Phase 5 |
+| Complex response parsing | Unreliable parsing | HIGH | Phase 5 |
 
 ## 📌 Session hiện tại
 
@@ -343,14 +328,33 @@ PP_DocLayout/
   - **Bạn tự code** theo hướng dẫn/gợi ý của tôi
   - Tôi **chỉ kiểm tra** lại sau khi bạn code xong
   - Không auto-write code, chỉ gợi ý và review
-- **Phase đã hoàn thành**: Phase 1, 2, 3
-- **Phase tiếp theo**: Phase 4 - Cleanup & Optimization
 
-## 🐛 Known Issues
+### Phase Progress Summary
 
-1. **core/__init__.py** có duplicate `__all__` definition (line 4 and 6)
-2. **reconstructor.py** vẫn còn duplicate `find_image_file()` function (line 44-57) - nên dùng từ utils
-3. **HY-MT support** vẫn còn trong codebase (reconstruct_multi.py) - cần quyết định keep hay remove
+| Phase | Status | Completion |
+|-------|--------|------------|
+| Phase 1: Foundation | ✅ Done | 100% |
+| Phase 2: Core Logic | ✅ Done | 100% |
+| Phase 3: Templates & Exporters Integration | 🔵 Pending | 40% (2/5 items done, 3 tasks pending) |
+| Phase 4: CLI Integration | 🔵 Pending | 33% (1/3 items done, 2 tasks pending) |
+| Phase 5: Batch Processing Rewrite | 🔵 Pending | 0% (3 tasks pending) |
+| Phase 6: Additional Features | 🔵 Pending | 0% |
+
+### Next Steps (Session 2026-02-20 Refactor Plan)
+
+**Bắt đầu từ đơn giản nhất:**
+
+1. **Task #1** (Phase 3): Fix duplicate `__all__` in `core/__init__.py` - 2 lines change
+2. **Task #2** (Phase 3): Create `renderer.py` module with build_project_data, translate_page_data, render_page_blocks
+3. **Task #3** (Phase 3): Deprecate process_project() in reconstructor.py
+4. **Task #4** (Phase 4): Update translate() command use renderer
+5. **Task #5** (Phase 4): Update run() command use renderer
+6. **Task #6** (Phase 4): Update core/__init__.py exports
+7. **Task #7** (Phase 5): Add max_concurrent_requests to config
+8. **Task #8** (Phase 5): Update GemmaTranslator.__init__ use config
+9. **Task #9** (Phase 5): Rewrite translate_batch() use ThreadPoolExecutor
+
+**See full details in:** `docs/CLAUDE.md`, `docs/PLANNING.md`, `docs/STATE.md`
 
 ---
-**Cập nhật lần cuối:** 2026-02-20
+**Cập nhật lần cuối:** 2026-02-20 (Refactor Plan Created)

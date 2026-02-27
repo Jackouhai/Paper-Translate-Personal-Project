@@ -62,6 +62,12 @@ class Settings(BaseSettings):
         description="Batch size for large texts (>500 tokens)"
     )
 
+    # ===== Concurrent Request Settings =====
+    max_concurrent_requests: int = Field(
+        default=32,
+        description="Max concurrent translation requests"
+    )
+
     # ===== Path Settings =====
     output_dir: str = Field(
         default="output",

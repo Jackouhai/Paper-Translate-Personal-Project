@@ -84,12 +84,33 @@ def translate(
     - Nội dung text chính
     - Figure/table captions
     """
-    from pp_doclayout.core import process_project
+    from pp_doclayout.core.renderer import build_project_data, translate_page_data, render_page_blocks
+    from pp_doclayout.exporters import HTMLExporter
 
     translator = get_gemma()
-    output_path = process_project(
-        Path(project_dir), translator=translator, output_suffix=output_suffix
-    )
+    # 1. Build project data from JSON files
+    project_dir = Path(project_dir)
+    project_data = build_project_data(project_dir)
+
+    # 2. Translate all pages
+    translated_pages = []
+    for page in project_data["pages"]:
+        translated_page = translate_page_data(page, translator)
+
+        # 3. Render page blocks to HTML
+        imgs_dir = project_dir / "imgs"
+        blocks_html = render_page_blocks(translated_page, imgs_dir, project_dir)
+        translated_page["html_content"] = blocks_html
+
+        translated_pages.append(translated_page)
+
+    project_data["pages"] = translated_pages
+
+    # 4. Export to HTML using HTMLExporter
+    exporter = HTMLExporter()
+    output_path = project_dir / f"{output_suffix}_{project_data['project_name']}.html"
+    exporter.export(project_data, output_path)
+
     typer.echo(f"✓ HTML created: {output_path}")
 
 
@@ -146,12 +167,32 @@ def run(
 
     # Step 2: Translate
     typer.echo("\n=== Step 2: Translate ===")
-    from pp_doclayout.core import process_project
+    from pp_doclayout.core.renderer import build_project_data, translate_page_data, render_page_blocks
 
     translator = get_gemma()
-    output_path = process_project(
-        project_dir, translator=translator, output_suffix=output_suffix
-    )
+
+    # 1. Build project data from JSON files
+    project_data = build_project_data(project_dir)
+
+    # 2. Translate all pages
+    translated_pages = []
+    for page in project_data["pages"]:
+        translated_page = translate_page_data(page, translator)
+
+        # 3. Render page blocks to HTML
+        imgs_dir = project_dir / "imgs"
+        blocks_html = render_page_blocks(translated_page, imgs_dir, project_dir)
+        translated_page["html_content"] = blocks_html
+
+        translated_pages.append(translated_page)
+
+    project_data["pages"] = translated_pages
+
+    # 4. Export to HTML using HTMLExporter
+    exporter = HTMLExporter()
+    output_path = project_dir / f"{output_suffix}_{project_data['project_name']}.html"
+    exporter.export(project_data, output_path)
+
     typer.echo(f"✓ HTML created: {output_path}")
 
 

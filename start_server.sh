@@ -3,7 +3,7 @@
 vllm serve Infomaniak-AI/vllm-translategemma-4b-it \
     --dtype bfloat16 \
     --max-model-len 32768\
-    --max-num-seqs 16 \
+    --max-num-seqs 32 \
     --max-num-batched-tokens 8192 \
     --gpu-memory-utilization 0.9 \
     --enforce-eager \

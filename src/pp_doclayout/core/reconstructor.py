@@ -1,5 +1,6 @@
 import json
 import re
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -364,6 +365,13 @@ def process_project(
     translator: "BaseTranslator",
     output_suffix: str = "translated",
 ) -> Path:
+    """Deprecated: Use build_project_data() + translate_page_data() + render_page_blocks() instead."""
+    warnings.warn(
+        "process_project() is deprecated. Use build_project_data(), "
+        "translate_page_data(), and render_page_blocks() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     imgs_dir = project_dir / "imgs"
     project_name = project_dir.name
     html_output = project_dir / f"{output_suffix}_{project_name}.html"
