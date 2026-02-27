@@ -1,5 +1,9 @@
 import asyncio
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass
 
 
 class BaseTranslator(ABC):
@@ -14,6 +18,23 @@ class BaseTranslator(ABC):
             Văn bản đã dịch. Nếu lỗi, trả về text gốc
         """
         pass
+
+    def translate_batch(
+        self,
+        texts: list[str],
+        source_lang: str = "en",
+        target_lang: str = "vi",
+    ) -> list[str | None]:
+        """
+        Translate multiple texts in batch.
+
+        Default implementation calls translate() for each text.
+        Override in subclasses for true batch processing.
+
+        Returns:
+            List of translations (None if failed for a particular text)
+        """
+        return [self.translate(text, source_lang, target_lang) for text in texts]
 
     async def async_translate(
         self, text: str, source_lang: str = "en", target_lang: str = "vi"
@@ -30,7 +51,7 @@ class BaseTranslator(ABC):
 
     @classmethod
     @abstractmethod
-    def load(cls) -> "BaseTranslator":
+    def load(cls, **kwargs) -> "BaseTranslator":
         """
         Factory method để khởi tạo translator
         Lazy load model khi cần

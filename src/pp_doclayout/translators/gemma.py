@@ -1,6 +1,7 @@
 from openai import OpenAI
 
 from .base import BaseTranslator
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 class GemmaTranslator(BaseTranslator):
@@ -9,12 +10,14 @@ class GemmaTranslator(BaseTranslator):
         base_url: str | None = None,
         model_name: str | None = None,
         max_tokens: int | None = None,
+        max_concurrent_requests: int | None = None
     ):
         from ..config import settings
 
         self.base_url = base_url or settings.vllm_base_url
         self.model_name = model_name or settings.vllm_model_name
         self.max_tokens = max_tokens or settings.vllm_max_tokens
+        self.max_concurrent_requests = max_concurrent_requests or settings.max_concurrent_requests
 
         self.client = OpenAI(base_url=self.base_url, api_key="unused")
 
@@ -43,6 +46,48 @@ class GemmaTranslator(BaseTranslator):
         except Exception as e:
             print(f"Gemma translation error: {e}")
             return text
+
+    def translate_batch(
+        self,
+        texts: list[str],
+        source_lang: str = "en",
+        target_lang: str = "vi",
+    ) -> list[str | None]:
+        """Translate multiple texts using concurrent requests.
+
+        vLLM will automatically batch these requests
+        via continuous batching.
+
+        Args:
+            texts: List of texts to translate
+            source_lang: Source language code
+            target_lang: Target language code
+
+        Returns:
+            List of translations (None if failed for a
+            particular text)
+        """
+        if not texts:
+            return []
+
+        # Use ThreadPoolExecutor for concurrent requests
+        max_workers = min(self.max_concurrent_requests, len(texts))
+        results = [None] * len(texts)
+
+        def translate_one(idx: int, text: str) -> tuple[int, str]:
+            """Translate a single text."""
+            translated = self.translate(text, source_lang, target_lang)
+            return (idx, translated)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(translate_one, i, text): i for i, text in enumerate(texts) if text and text.strip()
+            }
+
+            for future in as_completed(futures):
+                idx, translated = future.result()
+                results[idx] = translated
+        return results
 
     @classmethod
     def load(cls, **kwargs) -> "GemmaTranslator":

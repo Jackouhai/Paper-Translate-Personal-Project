@@ -1,12 +1,30 @@
 import json
 import re
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ..policies.translation_policy import should_translate
+from .batch_processor import BatchProcessor
 
 if TYPE_CHECKING:
     from ..translators.base import BaseTranslator
+
+
+class _CachedTranslator:
+    """Wrapper that caches translations for batch mode."""
+    
+    def __init__(self, translator: "BaseTranslator", cache: dict):
+        self.translator = translator
+        self.cache = cache
+    
+    def translate(self, text: str) -> str:
+        if text in self.cache:
+            return self.cache[text]
+        result = self.translator.translate(text)
+        self.cache[text] = result
+        return result
+
 
 LABEL_TO_TAG = {
     "doc_title": "h1",
@@ -347,6 +365,13 @@ def process_project(
     translator: "BaseTranslator",
     output_suffix: str = "translated",
 ) -> Path:
+    """Deprecated: Use build_project_data() + translate_page_data() + render_page_blocks() instead."""
+    warnings.warn(
+        "process_project() is deprecated. Use build_project_data(), "
+        "translate_page_data(), and render_page_blocks() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     imgs_dir = project_dir / "imgs"
     project_name = project_dir.name
     html_output = project_dir / f"{output_suffix}_{project_name}.html"
