@@ -35,10 +35,6 @@ def should_translate(label: str, content: str) -> TranslateAction:
         return "keep"
     
     if label in TRANSLATE_LABELS:
-        if len(words) < 6 and label == "text" and "@" not in content:
-            return "keep"
-        if "@" in content:
-            return "keep"
         return "translate"
 
     return "keep"
