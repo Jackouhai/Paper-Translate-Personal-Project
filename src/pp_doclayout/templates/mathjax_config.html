@@ -1,9 +1,13 @@
 <script>
 window.MathJax = {
+    loader: {
+    load: ['[tex]/textcomp']
+  },
   tex: {
     inlineMath: [['$', '$'], ['\\(', '\\)']],
     displayMath: [['$$', '$$'], ['\\[', '\\]']],
-    processEscapes: true
+    processEscapes: true,
+    packages: {'[+]': ['textcomp']}
   }
 };
 </script>
