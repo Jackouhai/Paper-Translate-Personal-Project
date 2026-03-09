@@ -26,6 +26,7 @@ CENTERED_LABELS = frozenset(
 
 VISUAL_LABELS = frozenset({"image", "chart", "table"})
 CAPTION_LABELS = frozenset({"figure_title", "table_caption"})
+FOOTNOTE_LABELS = frozenset({"vision_footnote"})
 REFERENCE_KEYWORDS = frozenset({"reference", "references", "bibliography"})
 
 
@@ -88,59 +89,138 @@ def render_visual(block: dict, imgs_dir: Path, output_dir: Path) -> str:
     return ""
 
 
-def group_blocks(blocks: list[dict]) -> list[dict]:
-    """Group visual blocks with captions into figure groups.
-
-    Rules:
-    - Visual (image/chart/table) opens buffer
-    - figure_title after visual -> sub-caption
-    - Two consecutive figure_titles -> parent caption, close group
-    - Other block -> close group if buffer is open
+def group_blocks(blocks: List[Dict]) -> List[Dict]:
     """
+    blocks -->  iterate
+                  │
+                  ├─ visual   → buffer
+                  │
+                  ├─ footnote → attach visual
+                  │
+                  ├─ caption
+                  │     ├─ prev caption → par_caption → flush
+                  │     ├─ ≥2 visual & no sub_caption → par_caption → flush
+                  │     └─ visual trước → sub_caption → attach
+                  │
+                  └─ other → flush + single
+    """
+    
     result = []
-    buffer = []
+    buffer_visuals = []
     prev_label = None
 
-    def flush_buffer():
-        if not buffer:
+    def flush_buffer(par_caption=None):
+        nonlocal buffer_visuals
+
+        if not buffer_visuals:
             return
-        visuals = [b for b in buffer if b["block_label"] in VISUAL_LABELS]
-        captions = [b for b in buffer if b["block_label"] in CAPTION_LABELS]
-        if visuals:
-            result.append(
-                {"type": "figure_group", "visuals": visuals, "captions": captions}
-            )
-        else:
-            for b in buffer:
-                result.append({"type": "single", "block": b})
+
+        group = {
+            "type": "figure_group",
+            "visuals": deepcopy(buffer_visuals),
+        }
+
+        if par_caption:
+            group["par_caption"] = deepcopy(par_caption)
+        result.append(group)
+        buffer_visuals = []
+        
+    def visuals_have_subcaption(buffer_visuals):
+        for v in buffer_visuals:
+            if "sub-caption" in v:
+                return True
+        return False
+
+    def last_visual():
+        return buffer_visuals[-1] if buffer_visuals else None
 
     for block in blocks:
         label = block.get("block_label")
 
-        if label in VISUAL_LABELS:
-            buffer.append(block)
+        # -------------------------
+        # NON RELATED BLOCK
+        # -------------------------
+        if label not in VISUAL_LABELS and label not in CAPTION_LABELS and label not in FOOTNOTE_LABELS:
+            flush_buffer()
+            result.append({
+                "type": "single",
+                "block": deepcopy(block)
+            })
             prev_label = label
             continue
 
-        if label in CAPTION_LABELS and buffer:
-            if prev_label in CAPTION_LABELS:
-                # 2 captions consecutively -> parent caption, close group
-                buffer.append(block)
-                flush_buffer()
-                buffer = []
-                prev_label = None
-            else:
-                buffer.append(block)
-                prev_label = label
+        # -------------------------
+        # VISUAL
+        # -------------------------
+        if label in VISUAL_LABELS:
+            buffer_visuals.append(deepcopy(block))
+            prev_label = label
             continue
 
-        # Other block -> close group if buffer open
-        flush_buffer()
-        buffer = []
-        prev_label = None
-        result.append({"type": "single", "block": block})
+        # -------------------------
+        # FOOTNOTE
+        # -------------------------
+        if label in FOOTNOTE_LABELS:
+            lv = last_visual()
+
+            if lv:
+                if "footnote" not in lv:
+                    lv["footnote"] = deepcopy(block)
+                else:
+                    if not isinstance(lv["footnote"], list):
+                        lv["footnote"] = [lv["footnote"]]
+                    lv["footnote"].append(deepcopy(block))
+            else:
+                result.append({
+                    "type": "single",
+                    "block": deepcopy(block)
+                })
+
+            prev_label = label
+            continue
+
+        # -------------------------
+        # CAPTION
+        # -------------------------
+        if label in CAPTION_LABELS:
+
+            visuals_count = len(buffer_visuals)
+            lv = last_visual()
+
+            # caption ngay sau caption → parent caption
+            if prev_label in CAPTION_LABELS:
+                block_copy = deepcopy(block)
+                block_copy["block_label"] = "par_caption"
+                flush_buffer(block_copy)
+                prev_label = "par_caption"
+                continue
+
+            # ≥2 visual → parent caption
+            if visuals_count >= 2 and not visuals_have_subcaption(buffer_visuals):
+                block_copy = deepcopy(block)
+                block_copy["block_label"] = "par_caption"
+                flush_buffer(block_copy)
+                prev_label = "par_caption"
+                continue
+
+            # visual → sub caption
+            if lv:
+                sub = deepcopy(block)
+                sub["block_label"] = "sub_caption"
+                lv["sub-caption"] = sub
+                prev_label = "sub_caption"
+                continue
+
+            # caption không có visual
+            result.append({
+                "type": "single",
+                "block": deepcopy(block)
+            })
+
+            prev_label = label
 
     flush_buffer()
+
     return result
 
 
@@ -153,17 +233,7 @@ def render_figure_group(
 
     sub_items = []
     parent_caption = None
-
-    if len(captions) > 1 and len(visuals) > 1:
-        parent_caption = captions[-1]
-        sub_captions = captions[:-1]
-    elif len(captions) == 1 and len(visuals) == 1:
-        parent_caption = captions[0]
-        sub_captions = []
-    else:
-        sub_captions = captions
-        parent_caption = None
-
+    
     caption_idx = 0
     for v in visuals:
         sub_cap = None
