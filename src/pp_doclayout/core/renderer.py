@@ -216,51 +216,89 @@ def group_blocks(blocks: List[Dict]) -> List[Dict]:
                 "type": "single",
                 "block": deepcopy(block)
             })
-
+            
             prev_label = label
 
     flush_buffer()
-
     return result
 
 
-def render_figure_group(
-    group: dict, imgs_dir: Path, output_dir: Path
-) -> str:
-    """Render a grouped figure with visual(s) and caption(s)."""
-    visuals = group["visuals"]
-    captions = group["captions"]
+def _render_footnotes(footnotes: List[Dict]) -> str:
+    """Render footnotes attached to a visual."""
+    if not footnotes:
+        return ""
 
-    sub_items = []
-    parent_caption = None
+    html = ""
+    for fn in footnotes:
+        text = fn.get("block_content") if isinstance(fn, dict) else str(fn)
+        text = escape(text or "")
+        html += f'<div class="figure-footnote">{text}</div>\n'
+
+    return html
+
+
+def _render_subfigure(
+    visual: Dict,
+    imgs_dir: Path,
+    output_dir: Path,
+) -> str:
+    """Render a single sub-figure (visual + sub-caption + footnotes)."""
+    sub_caption = visual.get("sub-caption")
+
+    foot = visual.get("footnote")
+    if foot is None:
+        footnotes = []
+    elif isinstance(foot, list):
+        footnotes = foot
+    else:
+        footnotes = [foot]
+
+    html = '<div class="sub-figure">\n'
+    html += render_visual(visual, imgs_dir, output_dir)
+
+    html += _render_footnotes(footnotes)
     
-    caption_idx = 0
-    for v in visuals:
-        sub_cap = None
-        if caption_idx < len(sub_captions):
-            sub_cap = sub_captions[caption_idx]
-            caption_idx += 1
-        sub_items.append({"visual": v, "caption": sub_cap})
+    if sub_caption:
+        html += _render_caption(sub_caption)
+    html += "</div>\n"
+
+    return html
+
+
+def render_figure_group(
+    group: dict,
+    imgs_dir: Path,
+    output_dir: Path,
+) -> str:
+    """Render a grouped figure."""
+    visuals: List[Dict] = group.get("visuals", [])
+    parent_caption: Optional[Dict] = group.get("par_caption")
 
     html = '<figure class="figure-group">\n'
 
-    if len(sub_items) > 1:
+    if len(visuals) > 1:
         html += '<div class="figure-row">\n'
-        for item in sub_items:
-            html += '<div class="sub-figure">\n'
-            html += render_visual(item["visual"], imgs_dir, output_dir)
-            if item["caption"]:
-                html += _render_caption(item["caption"])
-            html += "</div>\n"
+        for v in visuals:
+            html += _render_subfigure(v, imgs_dir, output_dir)
         html += "</div>\n"
     else:
-        item = sub_items[0]
-        html += render_visual(item["visual"], imgs_dir, output_dir)
+        v = visuals[0]
+        html += render_visual(v, imgs_dir, output_dir)
+
+        sub_caption = v.get("sub-caption")
+        if sub_caption:
+            html += _render_caption(sub_caption)
+
+        foot = v.get("footnote")
+        if foot:
+            footnotes = foot if isinstance(foot, list) else [foot]
+            html += _render_footnotes(footnotes)
 
     if parent_caption:
         html += _render_caption(parent_caption)
 
     html += "</figure>\n"
+
     return html
 
 
