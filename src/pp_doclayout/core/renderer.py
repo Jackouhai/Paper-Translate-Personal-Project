@@ -2,6 +2,7 @@
 
 import json
 import re
+import html
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -28,6 +29,8 @@ VISUAL_LABELS = frozenset({"image", "chart", "table"})
 CAPTION_LABELS = frozenset({"figure_title", "table_caption"})
 FOOTNOTE_LABELS = frozenset({"vision_footnote"})
 REFERENCE_KEYWORDS = frozenset({"reference", "references", "bibliography"})
+PAGE_W = 1224
+PAGE_H = 1584
 
 
 # ============== Helper Functions (reused from reconstructor.py) ==============
@@ -42,265 +45,88 @@ def find_image_file(
         return str(files[0].relative_to(output_dir))
     return None
 
+def build_block(b: Dict, imgs_dir: Path, output_dir: Path) -> str:
+    bbox = b.get("block_bbox")
 
-def _translate_text(text: str, label: str, translator: "BaseTranslator") -> str:
-    """Translate text with prefix preservation."""
-    prefix = ""
-    text_to_translate = text
+    x1, y1, x2, y2 = bbox
 
-    if label == "abstract" and text.lower().startswith("abstract"):
-        prefix = text[:8] + " "
-        text_to_translate = text[8:]
+    left = int(x1)
+    top = int(y1)
+    width = int(x2 - x1)
+    height = int(y2 - y1)
 
-    print(f"Translating: {text_to_translate[:50]}...")
-    return prefix + translator.translate(text_to_translate)
+    label = b.get("block_label")
+    tag = LABEL_TO_TAG.get(label, "div")
 
+    if label in VISUAL_LABELS:
+        return render_visual(b, imgs_dir, output_dir)
 
-def _render_caption(block: dict) -> str:
-    """Render caption text (already translated)."""
-    label = block.get("block_label", "")
-    content = block.get("block_content", "").strip()
+    content = b.get("block_content", "").strip()
 
-    if not content:
-        return ""
+    inner = f"<div class='inner-text auto-fit'>{html.escape(content)}</div>"
 
-    tag = LABEL_TO_TAG.get(label, "p")
-    return f'<{tag} class="{label}">{content}</{tag}>\n'
+    div = (
+        f'<{tag} class="block {label}" '
+        f'style="left:{left}px;top:{top}px;width:{width}px;height:{height}px;">'
+        f'{inner}'
+        f'</{tag}>'
+    )
+
+    return div
+
+def build_html(blocks: List[Dict], 
+                 imgs_dir : Path, 
+                 output_dir: Path
+                 ) -> html:
+    new_blocks = []
+
+    for b in blocks:
+        div = build_block(b)
+        blocks.append(div)
+
+    return "\n".join(blocks)
 
 
 def render_visual(block: dict, imgs_dir: Path, output_dir: Path) -> str:
-    """Render visual block (image, chart, or table)."""
+    """Render visual block (image, chart, table) with same block layout."""
+
     label = block.get("block_label", "")
-    bbox = block.get("block_bbox")
+    bbox = block.get("block_bbox", [0,0,0,0])
     content = block.get("block_content", "").strip()
+
+    x1, y1, x2, y2 = bbox
+
+    left = int(x1)
+    top = int(y1)
+    width = int(x2 - x1)
+    height = int(y2 - y1)
+
+    inner = ""
 
     if label in ("image", "chart"):
         img_path = find_image_file(imgs_dir, output_dir, bbox, label)
+
         if not img_path:
             alt_label = "chart" if label == "image" else "image"
             img_path = find_image_file(imgs_dir, output_dir, bbox, alt_label)
+
         if img_path:
-            return f'<img src="{img_path}" alt="{label}">\n'
+            inner = f'<img src="{img_path}" alt="{label}">'
+
+    elif label == "table":
+        inner = f'<div class="table-container">{content}</div>'
+
+    else:
         return ""
 
-    if label == "table":
-        return f'<div class="table-container">{content}</div>\n'
+    div = (
+        f'<div class="block {label}" '
+        f'style="left:{left}px;top:{top}px;width:{width}px;height:{height}px;">'
+        f'{inner}'
+        f'</div>\n'
+    )
 
-    return ""
-
-
-def group_blocks(blocks: List[Dict]) -> List[Dict]:
-    """
-    blocks -->  iterate
-                  │
-                  ├─ visual   → buffer
-                  │
-                  ├─ footnote → attach visual
-                  │
-                  ├─ caption
-                  │     ├─ prev caption → par_caption → flush
-                  │     ├─ ≥2 visual & no sub_caption → par_caption → flush
-                  │     └─ visual trước → sub_caption → attach
-                  │
-                  └─ other → flush + single
-    """
-    
-    result = []
-    buffer_visuals = []
-    prev_label = None
-
-    def flush_buffer(par_caption=None):
-        nonlocal buffer_visuals
-
-        if not buffer_visuals:
-            return
-
-        group = {
-            "type": "figure_group",
-            "visuals": deepcopy(buffer_visuals),
-        }
-
-        if par_caption:
-            group["par_caption"] = deepcopy(par_caption)
-        result.append(group)
-        buffer_visuals = []
-        
-    def visuals_have_subcaption(buffer_visuals):
-        for v in buffer_visuals:
-            if "sub-caption" in v:
-                return True
-        return False
-
-    def last_visual():
-        return buffer_visuals[-1] if buffer_visuals else None
-
-    for block in blocks:
-        label = block.get("block_label")
-
-        # -------------------------
-        # NON RELATED BLOCK
-        # -------------------------
-        if label not in VISUAL_LABELS and label not in CAPTION_LABELS and label not in FOOTNOTE_LABELS:
-            flush_buffer()
-            result.append({
-                "type": "single",
-                "block": deepcopy(block)
-            })
-            prev_label = label
-            continue
-
-        # -------------------------
-        # VISUAL
-        # -------------------------
-        if label in VISUAL_LABELS:
-            buffer_visuals.append(deepcopy(block))
-            prev_label = label
-            continue
-
-        # -------------------------
-        # FOOTNOTE
-        # -------------------------
-        if label in FOOTNOTE_LABELS:
-            lv = last_visual()
-
-            if lv:
-                if "footnote" not in lv:
-                    lv["footnote"] = deepcopy(block)
-                else:
-                    if not isinstance(lv["footnote"], list):
-                        lv["footnote"] = [lv["footnote"]]
-                    lv["footnote"].append(deepcopy(block))
-            else:
-                result.append({
-                    "type": "single",
-                    "block": deepcopy(block)
-                })
-
-            prev_label = label
-            continue
-
-        # -------------------------
-        # CAPTION
-        # -------------------------
-        if label in CAPTION_LABELS:
-
-            visuals_count = len(buffer_visuals)
-            lv = last_visual()
-
-            # caption ngay sau caption → parent caption
-            if prev_label in CAPTION_LABELS:
-                block_copy = deepcopy(block)
-                block_copy["block_label"] = "par_caption"
-                flush_buffer(block_copy)
-                prev_label = "par_caption"
-                continue
-
-            # ≥2 visual → parent caption
-            if visuals_count >= 2 and not visuals_have_subcaption(buffer_visuals):
-                block_copy = deepcopy(block)
-                block_copy["block_label"] = "par_caption"
-                flush_buffer(block_copy)
-                prev_label = "par_caption"
-                continue
-
-            # visual → sub caption
-            if lv:
-                sub = deepcopy(block)
-                sub["block_label"] = "sub_caption"
-                lv["sub-caption"] = sub
-                prev_label = "sub_caption"
-                continue
-
-            # caption không có visual
-            result.append({
-                "type": "single",
-                "block": deepcopy(block)
-            })
-            
-            prev_label = label
-
-    flush_buffer()
-    return result
-
-
-def _render_footnotes(footnotes: List[Dict]) -> str:
-    """Render footnotes attached to a visual."""
-    if not footnotes:
-        return ""
-
-    html = ""
-    for fn in footnotes:
-        text = fn.get("block_content") if isinstance(fn, dict) else str(fn)
-        text = escape(text or "")
-        html += f'<div class="figure-footnote">{text}</div>\n'
-
-    return html
-
-
-def _render_subfigure(
-    visual: Dict,
-    imgs_dir: Path,
-    output_dir: Path,
-) -> str:
-    """Render a single sub-figure (visual + sub-caption + footnotes)."""
-    sub_caption = visual.get("sub-caption")
-
-    foot = visual.get("footnote")
-    if foot is None:
-        footnotes = []
-    elif isinstance(foot, list):
-        footnotes = foot
-    else:
-        footnotes = [foot]
-
-    html = '<div class="sub-figure">\n'
-    html += render_visual(visual, imgs_dir, output_dir)
-
-    html += _render_footnotes(footnotes)
-    
-    if sub_caption:
-        html += _render_caption(sub_caption)
-    html += "</div>\n"
-
-    return html
-
-
-def render_figure_group(
-    group: dict,
-    imgs_dir: Path,
-    output_dir: Path,
-) -> str:
-    """Render a grouped figure."""
-    visuals: List[Dict] = group.get("visuals", [])
-    parent_caption: Optional[Dict] = group.get("par_caption")
-
-    html = '<figure class="figure-group">\n'
-
-    if len(visuals) > 1:
-        html += '<div class="figure-row">\n'
-        for v in visuals:
-            html += _render_subfigure(v, imgs_dir, output_dir)
-        html += "</div>\n"
-    else:
-        v = visuals[0]
-        html += render_visual(v, imgs_dir, output_dir)
-
-        sub_caption = v.get("sub-caption")
-        if sub_caption:
-            html += _render_caption(sub_caption)
-
-        foot = v.get("footnote")
-        if foot:
-            footnotes = foot if isinstance(foot, list) else [foot]
-            html += _render_footnotes(footnotes)
-
-    if parent_caption:
-        html += _render_caption(parent_caption)
-
-    html += "</figure>\n"
-
-    return html
-
+    return div
 
 # ============== Main Functions ==============
 def build_project_data(project_dir: Path) -> ProjectData:
@@ -383,73 +209,23 @@ def render_page_blocks(
     imgs_dir: Path,
     output_dir: Path,
 ) -> str:
-    """Render blocks to HTML (blocks already translated).
 
-    Args:
-        page: PageData with translated blocks
-        imgs_dir: Path to images directory
-        output_dir: Path to output directory
-
-    Returns:
-        HTML string for page blocks
-    """
     blocks = page["parsing_res_list"]
-    # Sort by block_id
+
+    width = page.get("width", PAGE_W)
+    height = page.get("height", PAGE_H)
+
     blocks.sort(key=lambda b: b.get("block_id", float("inf")))
 
-    # Check for reference section
-    in_reference = False
-    for block in blocks:
-        if block.get("block_label") == "paragraph_title":
-            title_lower = block.get("block_content", "").lower().strip()
-            if any(kw in title_lower for kw in REFERENCE_KEYWORDS):
-                in_reference = True
-            else:
-                in_reference = False
-            break
+    html_blocks = build_html(blocks, imgs_dir=imgs_dir, output_dir=output_dir)
 
-    # Group visual blocks with captions
-    grouped = group_blocks(blocks)
+    page_html = f"""
+    <div class="page-container">
+        <div class="page"
+            style="width:{width}px;height:{height}px;">
+            {html_blocks}
+        </div>
+    </div>
+    """
 
-    # Render
-    html = ""
-    for item in grouped:
-        if item["type"] == "figure_group":
-            html += render_figure_group(item, imgs_dir, output_dir)
-        else:
-            block = item["block"]
-            label = block.get("block_label", "")
-            content = block.get("block_content", "").strip()
-            bbox = block.get("block_bbox")
-
-            if in_reference and label == "text":
-                label = "reference_content"
-
-            # Skip empty content
-            if not content:
-                continue
-
-            style_attr = ' style="text-align: center;"' if label in CENTERED_LABELS else ""
-
-            if label in ("image", "chart"):
-                img_path = find_image_file(imgs_dir, output_dir, bbox, label)
-                if not img_path:
-                    alt_label = "chart" if label == "image" else "image"
-                    img_path = find_image_file(imgs_dir, output_dir, bbox, alt_label)
-                if img_path:
-                    html += f'<div class="{label}-container"{style_attr}><img src="{img_path}" alt="{label}"></div>\n'
-                continue
-
-            if label == "table":
-                html += f'<div class="table-container"{style_attr}>{content}</div>\n'
-                continue
-
-            if label == "display_formula":
-                html += f'<div class="display_formula"{style_attr}>{content}</div>\n'
-                continue
-
-            # Render text content (already translated)
-            tag = LABEL_TO_TAG.get(label, "p")
-            html += f'<{tag} class="{label}"{style_attr}>{content}</{tag}>\n'
-
-    return html
+    return page_html

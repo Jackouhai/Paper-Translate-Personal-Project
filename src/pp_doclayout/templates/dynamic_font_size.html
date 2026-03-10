@@ -1,0 +1,67 @@
+<script>
+    function fitText(el){
+        const cls = el.className || "";
+
+        let startSize = 14;
+        let minSize = 9;
+        let maxSize = 18;
+
+        if (cls.includes("doc_title")) {
+            startSize = 24;
+            minSize = 14;
+            maxSize = 30;
+        } else if (cls.includes("figure_title") || cls.includes("table_caption")) {
+            startSize = 14;
+            minSize = 10;
+            maxSize = 16;
+        } else if (cls.includes("abstract")) {
+            startSize = 14;
+            minSize = 9;
+            maxSize = 16;
+        } else {
+            startSize = 14;
+            minSize = 9;
+            maxSize = 16;
+        }
+
+        el.style.fontSize = startSize + "px";
+
+        while (
+            (el.scrollHeight > el.clientHeight ||
+            el.scrollWidth > el.clientWidth) &&
+            startSize > minSize
+        ){
+            startSize -= 0.5;
+            el.style.fontSize = startSize + "px";
+        }
+
+        while (
+            el.scrollHeight <= el.clientHeight &&
+            el.scrollWidth <= el.clientWidth &&
+            startSize < maxSize
+        ){
+            const next = startSize + 0.5;
+            el.style.fontSize = next + "px";
+
+            if (el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth){
+                el.style.fontSize = startSize + "px";
+                break;
+            }
+            startSize = next;
+        }
+    }
+
+    function fitAllText(){
+        document.querySelectorAll('.auto-fit').forEach(fitText);
+    }
+
+    window.addEventListener('load', () => {
+        fitAllText();
+
+        if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+            MathJax.typesetPromise().then(() => {
+                fitAllText();
+            }).catch(() => {});
+        }
+    });
+</script>
