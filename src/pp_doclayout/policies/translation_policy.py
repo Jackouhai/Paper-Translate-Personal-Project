@@ -17,7 +17,7 @@ NO_TRANSLATE_LABELS = frozenset(
     ]
 )
 
-SKIP_LABELS = frozenset(["aside_text", "header", "footer", "number", "content"])
+SKIP_LABELS = frozenset(["aside_text", "header", "footer", "number", "content", "algorithm"])
 
 TRANSLATE_LABELS = frozenset(["abstract", "text", "figure_title", "table_caption"])
 

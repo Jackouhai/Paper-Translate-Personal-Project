@@ -1,14 +1,16 @@
+<style>
 body{
-  font-family: 'Times New Roman', serif;
+  font-family: "Latin Modern Roman", serif;
   line-height:1.6;
   background:#e0e0e0;
   margin:0;
 }
+
 /* page layout giữ nguyên */
 .page{
   position:relative;
-  width:1224;
-  height:15;
+  width:1224px;
+  height:1584px;
   background:white;
   margin:20px auto;
   box-shadow:0 6px 18px rgba(0,0,0,0.1);
@@ -17,13 +19,19 @@ body{
 
 /* block OCR */
 .block{
+  word-break: normal;
+  overflow-wrap: break-word;
+  hyphens: auto;
   position:absolute;
   box-sizing:border-box;
   overflow:hidden;
-  word-break:break-word;
   white-space:pre-wrap;
-  font-size:14px;
-  line-height:1.5;
+  line-height:1.2;
+  text-align: justify
+}
+
+h1, h2 {
+  margin: 0
 }
 
 /* ===== TITLE ===== */
@@ -35,36 +43,24 @@ body{
 }
 
 .block.paragraph_title{
-  font-size:18px;
   font-weight:bold;
-  border-bottom:1px solid #eee;
 }
 
 /* ===== CAPTION ===== */
 
 .block.figure_title,
 .block.table_caption{
-  font-size:13px;
-  font-weight:bold;
-  font-style:italic;
-  color:#444;
-  text-align:center;
 }
 
 /* ===== ABSTRACT ===== */
 
 .block.abstract{
-  font-style:italic;
-  background:#fdfdfd;
-  border-left:4px solid #ddd;
-  padding:10px;
 }
 
 /* ===== TEXT ===== */
 
 .block.text{
   text-align:justify;
-  text-indent:1.5em;
 }
 
 /* ===== REFERENCE ===== */
@@ -87,7 +83,7 @@ body{
 .block table td,
 .block table th{
   border:1px solid #444;
-  padding:6px;
+  padding:2px;
   text-align:left;
 }
 
@@ -101,10 +97,6 @@ body{
 
 /* ===== FIGURE GROUP ===== */
 
-.figure-group{
-  text-align:center;
-}
-
 .figure-group figcaption{
   font-size:13px;
   font-weight:bold;
@@ -112,20 +104,13 @@ body{
   color:#444;
 }
 
-.figure-row{
-  display:flex;
-  justify-content:center;
-  gap:16px;
-  flex-wrap:wrap;
+.aside_text {
+    font-size: 0.85em;
+    color: #444;
+    line-height: 1.4;
 }
 
-.sub-figure{
-  min-width:200px;
-  text-align:center;
+mjx-container[jax="CHTML"][display="true"] {
+  margin: 0 !important;
 }
-
-.sub-caption{
-  font-size:12px;
-  font-style:italic;
-  color:#555;
-}
+</style>
