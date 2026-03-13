@@ -226,6 +226,19 @@ Khi hoàn thành 1 task:
 
 ## 🔗 Session History
 
+### 2026-03-06 (continuation)
+- **Added PaddleOCR-VL config options:**
+  - `paddle_ocr_layout_detection_model_name` - default: "PP-DocLayoutV3"
+  - `paddle_ocr_use_layout_detection` - default: True
+  - Added `use_ocr_for_image_block` to CLI parse command (was missing)
+- **Fixed output rendering issues:**
+  - Strip "#" markers from `doc_title` (in addition to `paragraph_title`)
+  - Fixed LaTeX escaping for `display_formula` blocks (`\\` → `\`)
+  - Skip header/footer/number/vision_footnote blocks via should_translate() check
+  - Fixed figure grouping logic for multiple visuals with 1 caption
+- **Removed `table_caption`** from code (PaddleOCR-VL doesn't produce this label)
+- **Updated .env.example** with all new PaddleOCR-VL config options
+
 ### 2026-02-27 (late evening)
 - **Fixed duplicate translation bug!** Removed translation from render functions:
   - Task #10: Fixed translate_page_data() to use translate_batch() (was using translate() per block)
@@ -259,4 +272,4 @@ Khi hoàn thành 1 task:
 ---
 
 **Session started:** 2026-02-20
-**Last updated:** 2026-02-27
+**Last updated:** 2026-03-06

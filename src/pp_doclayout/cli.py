@@ -47,6 +47,13 @@ def parse(
     pipeline = PaddleOCRVL(
         vl_rec_backend=settings.paddle_ocr_backend,
         vl_rec_server_url=settings.paddle_ocr_server_url,
+        format_block_content=settings.paddle_ocr_format_block_content,
+        use_doc_unwarping=settings.paddle_ocr_use_doc_unwarping,
+        use_chart_recognition=settings.paddle_ocr_use_chart_recognition,
+        merge_layout_blocks=settings.paddle_ocr_merge_layout_blocks,
+        use_ocr_for_image_block=settings.paddle_use_ocr_for_image_block,
+        layout_detection_model_name=settings.paddle_ocr_layout_detection_model_name,
+        use_layout_detection=settings.paddle_ocr_use_layout_detection,
     )
 
     # Process output
@@ -153,6 +160,13 @@ def run(
     pipeline = PaddleOCRVL(
         vl_rec_backend=settings.paddle_ocr_backend,
         vl_rec_server_url=settings.paddle_ocr_server_url,
+        format_block_content=settings.paddle_ocr_format_block_content,
+        use_doc_unwarping=settings.paddle_ocr_use_doc_unwarping,
+        use_chart_recognition=settings.paddle_ocr_use_chart_recognition,
+        merge_layout_blocks=settings.paddle_ocr_merge_layout_blocks,
+        use_ocr_for_image_block=settings.paddle_use_ocr_for_image_block,
+        layout_detection_model_name=settings.paddle_ocr_layout_detection_model_name,
+        use_layout_detection=settings.paddle_ocr_use_layout_detection,
     )
 
     output = pipeline.predict(str(pdf_path))

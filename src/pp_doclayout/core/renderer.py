@@ -25,7 +25,7 @@ CENTERED_LABELS = frozenset(
 )
 
 VISUAL_LABELS = frozenset({"image", "chart", "table"})
-CAPTION_LABELS = frozenset({"figure_title", "table_caption"})
+CAPTION_LABELS = frozenset({"figure_title"})
 REFERENCE_KEYWORDS = frozenset({"reference", "references", "bibliography"})
 
 
@@ -157,8 +157,13 @@ def render_figure_group(
     if len(captions) > 1 and len(visuals) > 1:
         parent_caption = captions[-1]
         sub_captions = captions[:-1]
-    elif len(captions) == 1 and len(visuals) == 1:
+    elif len(captions) == 1:
+        # 1 caption with any number of visuals -> parent caption
         parent_caption = captions[0]
+        sub_captions = []
+    elif len(visuals) == 1 and len(captions) == 0:
+        # 1 visual, no caption
+        parent_caption = None
         sub_captions = []
     else:
         sub_captions = captions
@@ -314,6 +319,11 @@ def render_page_blocks(
             content = block.get("block_content", "").strip()
             bbox = block.get("block_bbox")
 
+            # Check if should skip this block
+            action = should_translate(label, content)
+            if action == "skip":
+                continue
+
             if in_reference and label == "text":
                 label = "reference_content"
 
@@ -337,11 +347,19 @@ def render_page_blocks(
                 continue
 
             if label == "display_formula":
-                html += f'<div class="display_formula"{style_attr}>{content}</div>\n'
+                # Fix LaTeX escaping: replace \\ with \ for MathJax
+                fixed_content = content.replace('\\\\', '\\')
+                html += f'<div class="display_formula"{style_attr}>{fixed_content}</div>\n'
                 continue
+
+            # Clean heading markers for doc_title and paragraph_title
+            display_content = content
+            if label in ("doc_title", "paragraph_title"):
+                # Remove Markdown heading markers (#, ##, ###)
+                display_content = content.lstrip('#').strip()
 
             # Render text content (already translated)
             tag = LABEL_TO_TAG.get(label, "p")
-            html += f'<{tag} class="{label}"{style_attr}>{content}</{tag}>\n'
+            html += f'<{tag} class="{label}"{style_attr}>{display_content}</{tag}>\n'
 
     return html

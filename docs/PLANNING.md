@@ -470,6 +470,38 @@ After implementing Phase 5, discovered and fixed critical bugs:
 
 **Result:** Now properly uses concurrent requests via ThreadPoolExecutor and vLLM's continuous batching
 
+### Additional Fixes (2026-03-06)
+
+| Issue | Description | Fix |
+|--------|-------------|------|
+| doc_title heading markers | doc_title content had "#" prefix like "# Title" | Strip "#" for doc_title and paragraph_title |
+| LaTeX escaping in display_formula | Double backslashes `\\` causing MathJax to fail | Replace `\\` with `\` before rendering |
+| Header/footer blocks in output | Blocks with SKIP labels still appeared in output | Added should_translate() check to skip blocks |
+| vision_footnote in output | OCR error text appearing as standalone block | Added "vision_footnote" to SKIP_LABELS |
+| Figure grouping wrong | 8 visuals with 1 caption not showing caption | Fixed render_figure_group() logic for 1 caption case |
+| table_caption label | PaddleOCR-VL doesn't produce "table_caption" label | Removed "table_caption" from all code |
+
+**Files changed:**
+- `src/pp_doclayout/core/renderer.py` - Fixed heading markers, LaTeX escaping, skip check, figure grouping, removed table_caption
+- `src/pp_doclayout/policies/translation_policy.py` - Added vision_footnote to SKIP_LABELS, removed table_caption
+- `src/pp_doclayout/config.py` - Added 2 new PaddleOCR-VL config fields
+- `src/pp_doclayout/cli.py` - Added all PaddleOCR-VL config to both parse and run
+- `.env.example` - Added all new config options
+
+### PaddleOCR-VL Config Options (2026-03-06)
+
+| Config field | Default | Description |
+|--------------|---------|-------------|
+| `paddle_ocr_format_block_content` | True | Format block content (LaTeX, math, table) |
+| `paddle_ocr_use_doc_unwarping` | True | Use document unwarping (deskew, straighten) |
+| `paddle_ocr_use_chart_recognition` | True | Parse charts separately |
+| `paddle_ocr_merge_layout_blocks` | True | Merge related layout blocks |
+| `paddle_ocr_layout_detection_model_name` | "PP-DocLayoutV3" | Layout detection model name |
+| `paddle_ocr_use_layout_detection` | True | Use layout detection |
+| `paddle_use_ocr_for_image_block` | True | OCR for images |
+
+All options are configurable via environment variables (prefix: `PPDOCLAYOUT_`) or `.env` file.
+
 ---
 
 # ============================================
@@ -510,4 +542,4 @@ After implementing Phase 5, discovered and fixed critical bugs:
 
 ---
 
-**Last updated:** 2026-02-27
+**Last updated:** 2026-03-06

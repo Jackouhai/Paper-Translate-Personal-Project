@@ -47,6 +47,34 @@ class Settings(BaseSettings):
         default="vllm-server",
         description="Backend for PaddleOCR-VL (vllm-server or local)"
     )
+    paddle_ocr_format_block_content: bool = Field(
+        default=True,
+        description="Format block content (LaTeX, math, table)"
+    )
+    paddle_ocr_use_doc_unwarping: bool = Field(
+        default=True,
+        description="Use document unwarping (deskew, straighten)"
+    )
+    paddle_ocr_use_chart_recognition: bool = Field(
+        default=True,
+        description="Parse charts separately"
+    )
+    paddle_ocr_merge_layout_blocks: bool = Field(
+        default=True,
+        description="Merge related layout blocks"
+    )
+    paddle_ocr_layout_detection_model_name: str = Field(
+        default="PP-DocLayoutV3",
+        description="Layout detection model name"
+    )
+    paddle_ocr_use_layout_detection: bool = Field(
+        default=True,
+        description="Use layout detection"
+    )
+    paddle_use_ocr_for_image_block: bool = Field(
+        default=True,
+        description="OCR for images"
+    )
 
     # ===== Batch Processing Settings =====
     batch_size_small: int = Field(
@@ -72,7 +100,7 @@ class Settings(BaseSettings):
     output_dir: str = Field(
         default="output",
         description="Base output directory"
-    )
+    )   
 
     # ===== Export Settings =====
     # Note: In .env file, use: PPDOCLAYOUT_EXPORT_FORMATS=html,pdf,markdown

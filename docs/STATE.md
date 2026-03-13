@@ -171,6 +171,24 @@
 
 ## 📝 Notes
 
+### Session 2026-03-06 (continuation)
+- **Added PaddleOCR-VL config options:**
+  - `paddle_ocr_layout_detection_model_name` - default: "PP-DocLayoutV3"
+  - `paddle_ocr_use_layout_detection` - default: True
+  - `use_ocr_for_image_block` - added to CLI parse command (was missing)
+- **Fixed output rendering issues:**
+  - Strip "#" markers from `doc_title` in addition to `paragraph_title`
+  - Fixed LaTeX escaping for `display_formula` blocks (`\\` → `\`)
+  - Skip header/footer/number/vision_footnote blocks from rendering via should_translate()
+  - Fixed figure grouping logic for multiple visuals with 1 caption
+  - Removed `table_caption` label (PaddleOCR-VL doesn't produce it)
+- **Updated .env.example** with all new PaddleOCR-VL config options
+- **Configured .env** with:
+  - `use_chart_recognition=false`
+  - `use_doc_unwarping=false`
+  - `layout_detection_model_name=PP-DocLayoutV3`
+  - `use_layout_detection=true`
+
 ### Session 2026-02-27 (late evening)
 - **Fixed duplicate translation bug!** Removed translation from render functions:
   - Task #10: Fixed translate_page_data() to use translate_batch() (was using translate() per block)
@@ -215,4 +233,4 @@
 
 ---
 
-**Last updated:** 2026-02-27
+**Last updated:** 2026-03-06
