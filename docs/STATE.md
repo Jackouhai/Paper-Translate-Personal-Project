@@ -7,6 +7,8 @@
 ## 📊 Overall Progress
 
 ```
+█████████████████████████░   86%
+```
 ████████████████████████░░░  83%
 ```
 
@@ -135,11 +137,11 @@
 
 ## 🔵 Phase 6: Additional Features
 
-| Task | Status | Date | Notes |
-|------|--------|-------|-------|
-| HY-MT translator in new architecture | 🔵 Pending | - | LOW PRIORITY |
-| PDF exporter | 🔵 Pending | - | LOW PRIORITY |
-| Parallel project processing | 🔵 Pending | - | LOW PRIORITY |
+| Task | Description | Status | Date | Priority |
+|------|-------------|--------|-------|----------|
+| Clean up old scripts | Remove legacy scripts in root directory (main.py, reconstruct_*.py, etc.) | 🔵 Pending | - | MEDIUM |
+| PDF exporter | Export to PDF format (beyond HTML) | 🔵 Pending | - | LOW |
+| Improve documentation | Update docs for Phase 1-5 completion | 🔵 Pending | - | LOW |
 
 **Completion:** 0%
 
@@ -170,6 +172,21 @@
 ---
 
 ## 📝 Notes
+
+### Session 2026-03-16 (Current)
+- **Phase 6 Updated!** Removed HY-MT translator and Parallel project processing from scope
+- New Phase 6 tasks:
+  - Clean up old scripts (MEDIUM)
+  - PDF exporter (LOW)
+  - Improve documentation (LOW)
+- Overall progress: 86% (19/22 tasks complete)
+- Phase 1-5: All completed ✅
+  - Phase 1: Foundation - Configuration & Utilities ✅
+  - Phase 2: Core Logic & Batch Processing ✅
+  - Phase 3: Templates & Exporters Integration ✅
+  - Phase 4: CLI Integration ✅
+  - Phase 5: Batch Processing Rewrite (ThreadPoolExecutor) ✅
+  - Phase 6: Additional Features (3 tasks, 0% done) 🔵
 
 ### Session 2026-02-27 (late evening)
 - **Fixed duplicate translation bug!** Removed translation from render functions:

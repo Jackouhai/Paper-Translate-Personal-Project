@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ..translators.base import BaseTranslator
 
 
-# ============== Constants (reused from reconstructor.py) ==============
+# ============== Constants ==============
 LABEL_TO_TAG = {
     "doc_title": "h1",
     "paragraph_title": "h2",
@@ -21,19 +21,23 @@ LABEL_TO_TAG = {
     "formula_number": "span",
 }
 
-CENTERED_LABELS = frozenset(
-    ["figure_title", "image", "chart", "display_formula", "authors"]
-)
+TITLE_LABELS = frozenset({"doc_title", "paragraph_title"})
+FOOTNOTE_LABELS = frozenset({"footnote"})
+HTML_WRAPPER_LABELS = frozenset({
+    "figure_title", "display_formula", "authors",
+    "vision_footnote", "abstract", "table_caption"
+})
+ALGORITHM_LABELS = frozenset({
+    "algorithm"
+})
 
 VISUAL_LABELS = frozenset({"image", "chart", "table"})
-CAPTION_LABELS = frozenset({"figure_title", "table_caption"})
-FOOTNOTE_LABELS = frozenset({"vision_footnote"})
 REFERENCE_KEYWORDS = frozenset({"reference", "references", "bibliography"})
 PAGE_W = 1224
 PAGE_H = 1584
 
 
-# ============== Helper Functions (reused from reconstructor.py) ==============
+# ============== Helper Functions ==============
 def find_image_file(
     imgs_dir: Path, output_dir: Path, bbox: list, label: str
 ) -> str | None:
@@ -45,9 +49,30 @@ def find_image_file(
         return str(files[0].relative_to(output_dir))
     return None
 
-def build_block(b: Dict, imgs_dir: Path, output_dir: Path) -> str:
-    bbox = b.get("block_bbox")
 
+def escape_inner_html(content: str) -> str:
+    """Escape inner HTML content while preserving outer tags."""
+    m = re.match(r"(<[^>]+>)(.*?)(</[^>]+>)", content, re.DOTALL)
+    if not m:
+        return html.escape(content)
+
+    start_tag, inner, end_tag = m.groups()
+    inner_escaped = html.escape(inner)
+    return f"{start_tag}{inner_escaped}{end_tag}"
+
+
+def build_block(b: dict, imgs_dir: Path, output_dir: Path) -> str:
+    """Build a single block div with absolute positioning.
+
+    Args:
+        b: Block data dictionary
+        imgs_dir: Path to images directory
+        output_dir: Path to output directory
+
+    Returns:
+        HTML string for block
+    """
+    bbox = b.get("block_bbox")
     x1, y1, x2, y2 = bbox
 
     left = int(x1)
@@ -62,11 +87,20 @@ def build_block(b: Dict, imgs_dir: Path, output_dir: Path) -> str:
         return render_visual(b, imgs_dir, output_dir)
 
     content = b.get("block_content", "").strip()
+    inner = ""
 
-    inner = f"<div class='inner-text auto-fit'>{html.escape(content)}</div>"
+    if label in TITLE_LABELS:
+        content = content.strip("#").strip()
+
+    if label in FOOTNOTE_LABELS:
+        inner = content
+    elif label in HTML_WRAPPER_LABELS:
+        inner = escape_inner_html(content)
+    else:
+        inner = html.escape(content)
 
     div = (
-        f'<{tag} class="block {label}" '
+        f'<{tag} class="block {label} auto-fit" '
         f'style="left:{left}px;top:{top}px;width:{width}px;height:{height}px;">'
         f'{inner}'
         f'</{tag}>'
@@ -74,24 +108,31 @@ def build_block(b: Dict, imgs_dir: Path, output_dir: Path) -> str:
 
     return div
 
-def build_html(blocks: List[Dict], 
-                 imgs_dir : Path, 
-                 output_dir: Path
-                 ) -> html:
+
+def build_html(blocks: list[dict], imgs_dir: Path, output_dir: Path) -> str:
+    """Build HTML from blocks using absolute positioning.
+
+    Args:
+        blocks: List of block dictionaries
+        imgs_dir: Path to images directory
+        output_dir: Path to output directory
+
+    Returns:
+        HTML string joining all block divs
+    """
     new_blocks = []
 
     for b in blocks:
-        div = build_block(b)
-        blocks.append(div)
+        div = build_block(b, imgs_dir, output_dir)
+        new_blocks.append(div)
 
-    return "\n".join(blocks)
+    return "\n".join(new_blocks)
 
 
 def render_visual(block: dict, imgs_dir: Path, output_dir: Path) -> str:
-    """Render visual block (image, chart, table) with same block layout."""
-
+    """Render visual block (image, chart, table) with absolute positioning."""
     label = block.get("block_label", "")
-    bbox = block.get("block_bbox", [0,0,0,0])
+    bbox = block.get("block_bbox", [0, 0, 0, 0])
     content = block.get("block_content", "").strip()
 
     x1, y1, x2, y2 = bbox
@@ -127,6 +168,7 @@ def render_visual(block: dict, imgs_dir: Path, output_dir: Path) -> str:
     )
 
     return div
+
 
 # ============== Main Functions ==============
 def build_project_data(project_dir: Path) -> ProjectData:
@@ -209,14 +251,24 @@ def render_page_blocks(
     imgs_dir: Path,
     output_dir: Path,
 ) -> str:
+    """Render page blocks to HTML using absolute positioning.
 
+    Args:
+        page: PageData with blocks to render
+        imgs_dir: Path to images directory
+        output_dir: Path to output directory
+
+    Returns:
+        HTML string for all blocks
+    """
     blocks = page["parsing_res_list"]
-
     width = page.get("width", PAGE_W)
     height = page.get("height", PAGE_H)
 
+    # Sort by block_id to maintain order
     blocks.sort(key=lambda b: b.get("block_id", float("inf")))
 
+    # Render ALL blocks (no filtering)
     html_blocks = build_html(blocks, imgs_dir=imgs_dir, output_dir=output_dir)
 
     page_html = f"""

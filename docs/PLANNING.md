@@ -35,10 +35,10 @@ OS: Linux 6.17.0-14-generic
 
 1. ✅ Tách code thành modules nhỏ, dễ quản lý
 2. ✅ Dùng config file (.env) thay vì hardcode
-3. 🔵 Dùng Jinja2 templates cho HTML (templates có, chưa dùng)
+3. ✅ Dùng Jinja2 templates cho HTML
 4. ✅ Thêm tests
-5. 🔵 Thêm PDF export (beyond HTML)
-6. 🔵 Xử lý song song nhiều projects
+5. 🔵 Thêm PDF export (beyond HTML) - Phase 6
+6. 🔵 Xóa các legacy scripts ở root directory - Phase 6
 
 ---
 
@@ -68,18 +68,30 @@ PP_DocLayout/
 │   │
 │   ├── exporters/               # Export handlers ✅
 │   │   ├── base.py
-│   │   ├── html.py
-│   │   └── pdf.py (🔵)
+│   │   ├── html.py ✅
+│   │   └── pdf.py (🔵 Phase 6)
 │   │
-│   ├── translators/
+│   ├── translators/             # Translator implementations ✅
 │   │   ├── base.py ✅
-│   │   ├── gemma.py ✅
-│   │   └── hymt.py (🔵)
+│   │   └── gemma.py ✅
 │   │
 │   └── core/                    # Core business logic
 │       ├── batch_processor.py   ✅
-│       ├── reconstructor.py     🔵 Need refactor
-│       └── renderer.py         🔵 NEW - will be created
+│       └── renderer.py          ✅
+│
+├── tests/                      # Unit tests ✅
+├── docs/                       # Documentation ✅
+│   ├── CLAUDE.md
+│   ├── STATE.md
+│   └── PLANNING.md
+├── pyproject.toml
+├── .env.example
+└── .env
+│
+├── main.py                     # Legacy scripts (to be removed - Phase 6)
+├── reconstruct_gemma.py         # Legacy scripts (to be removed - Phase 6)
+├── reconstruct_multi.py        # Legacy scripts (to be removed - Phase 6)
+└── ... (other legacy files)    # Legacy scripts (to be removed - Phase 6)
 │
 ├── tests/                     # Unit tests ✅
 ├── docs/                      # Documentation ✅
@@ -478,17 +490,26 @@ After implementing Phase 5, discovered and fixed critical bugs:
 
 ## 🔵 Phase 6: Additional Features
 
-| Task | Status | Priority |
-|------|--------|----------|
-| HY-MT translator in new architecture | 🔵 Pending | LOW |
-| PDF exporter | 🔵 Pending | LOW |
-| Parallel project processing | 🔵 Pending | LOW |
+| Task | Description | Status | Priority |
+|------|-------------|--------|----------|
+| Clean up old scripts | Remove legacy scripts in root directory (main.py, reconstruct_*.py, etc.) | 🔵 Pending | MEDIUM |
+| PDF exporter | Export to PDF format (beyond HTML) | 🔵 Pending | LOW |
+| Improve documentation | Update docs for Phase 1-5 completion | 🔵 Pending | LOW |
 
 **Completion:** 0%
 
 ---
 
 ## 📝 Notes
+
+### Session 2026-03-16 - Phase 6 Updated
+- Removed HY-MT translator and Parallel project processing from Phase 6 scope
+- New Phase 6 tasks:
+  - Clean up old scripts (MEDIUM)
+  - PDF exporter (LOW)
+  - Improve documentation (LOW)
+- Phase 1-5: All completed ✅ (19 tasks)
+- Overall progress: 86%
 
 ### Session 2026-02-20 - Refactor Plan Created
 - Created comprehensive refactor plan with 3 phases (9 tasks total)

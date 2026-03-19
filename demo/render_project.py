@@ -41,13 +41,13 @@ LABEL_TO_TAG = {
 }
 TITLE_LABELS = frozenset({"doc_title", "paragraph_title"})
 FOOTNOTE_LABELS = frozenset({"footnote"})
-HTML_WRAPPER_LABELS = frozenset(
-    [{"figure_title", "display_formula", "authors", 
-     "vision_footnote", "abstract", "table_caption"}]
-)
-ALGORITHM_LABELS = frozenset(
-    [{"algorithm"}]
-)
+HTML_WRAPPER_LABELS = frozenset({
+    "figure_title", "display_formula", "authors",
+    "vision_footnote", "abstract", "table_caption"
+})
+ALGORITHM_LABELS = frozenset({
+    "algorithm"
+})
 
 VISUAL_LABELS = frozenset({"image", "chart", "table"})
 REFERENCE_KEYWORDS = frozenset({"reference", "references", "bibliography"})
@@ -293,12 +293,18 @@ class NoOpTranslator:
 
 
 def load_translator() -> Any:
-    """Thử import translator (ví dụ translators.gemma.get_gemma()) nếu có, ngược lại NoOpTranslator."""
+    """Thử import translator từ pp_doclayout.translators.gemma."""
     try:
-        # thay đổi đường dẫn import nếu bạn có module translator khác
-        from translators.gemma import get_gemma  # type: ignore
-        return get_gemma()
-    except Exception:
+        from pp_doclayout.translators.gemma import GemmaTranslator  # type: ignore
+        from pp_doclayout.config import Settings
+        config = Settings()
+        return GemmaTranslator(
+            base_url=config.vllm_base_url,
+            model_name=config.vllm_model_name,
+            max_tokens=config.vllm_max_tokens,
+        )
+    except Exception as e:
+        print(f"⚠️ Không load được GemmaTranslator: {e}")
         return NoOpTranslator()
 
 
