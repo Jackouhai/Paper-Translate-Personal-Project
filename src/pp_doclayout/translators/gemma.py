@@ -72,6 +72,7 @@ class GemmaTranslator(BaseTranslator):
 
         # Use ThreadPoolExecutor for concurrent requests
         max_workers = min(self.max_concurrent_requests, len(texts))
+        print(f"[DEBUG] translate_batch: Processing {len(texts)} texts with max_workers={max_workers}, vLLM at {self.base_url}")
         results = [None] * len(texts)
 
         def translate_one(idx: int, text: str) -> tuple[int, str]:

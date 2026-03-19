@@ -2,6 +2,7 @@
 
 import json
 import re
+import html
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
     from ..translators.base import BaseTranslator
 
 
-# ============== Constants (reused from reconstructor.py) ==============
+# ============== Constants ==============
 LABEL_TO_TAG = {
     "doc_title": "h1",
     "paragraph_title": "h2",
@@ -20,16 +21,23 @@ LABEL_TO_TAG = {
     "formula_number": "span",
 }
 
-CENTERED_LABELS = frozenset(
-    ["figure_title", "image", "chart", "display_formula", "authors"]
-)
+TITLE_LABELS = frozenset({"doc_title", "paragraph_title"})
+FOOTNOTE_LABELS = frozenset({"footnote"})
+HTML_WRAPPER_LABELS = frozenset({
+    "figure_title", "display_formula", "authors",
+    "vision_footnote", "abstract", "table_caption"
+})
+ALGORITHM_LABELS = frozenset({
+    "algorithm"
+})
 
 VISUAL_LABELS = frozenset({"image", "chart", "table"})
-CAPTION_LABELS = frozenset({"figure_title"})
 REFERENCE_KEYWORDS = frozenset({"reference", "references", "bibliography"})
+PAGE_W = 1224
+PAGE_H = 1584
 
 
-# ============== Helper Functions (reused from reconstructor.py) ==============
+# ============== Helper Functions ==============
 def find_image_file(
     imgs_dir: Path, output_dir: Path, bbox: list, label: str
 ) -> str | None:
@@ -42,161 +50,124 @@ def find_image_file(
     return None
 
 
-def _translate_text(text: str, label: str, translator: "BaseTranslator") -> str:
-    """Translate text with prefix preservation."""
-    prefix = ""
-    text_to_translate = text
+def escape_inner_html(content: str) -> str:
+    """Escape inner HTML content while preserving outer tags."""
+    m = re.match(r"(<[^>]+>)(.*?)(</[^>]+>)", content, re.DOTALL)
+    if not m:
+        return html.escape(content)
 
-    if label == "abstract" and text.lower().startswith("abstract"):
-        prefix = text[:8] + " "
-        text_to_translate = text[8:]
-
-    print(f"Translating: {text_to_translate[:50]}...")
-    return prefix + translator.translate(text_to_translate)
+    start_tag, inner, end_tag = m.groups()
+    inner_escaped = html.escape(inner)
+    return f"{start_tag}{inner_escaped}{end_tag}"
 
 
-def _render_caption(block: dict) -> str:
-    """Render caption text (already translated)."""
-    label = block.get("block_label", "")
-    content = block.get("block_content", "").strip()
+def build_block(b: dict, imgs_dir: Path, output_dir: Path) -> str:
+    """Build a single block div with absolute positioning.
 
-    if not content:
-        return ""
+    Args:
+        b: Block data dictionary
+        imgs_dir: Path to images directory
+        output_dir: Path to output directory
 
-    tag = LABEL_TO_TAG.get(label, "p")
-    return f'<{tag} class="{label}">{content}</{tag}>\n'
+    Returns:
+        HTML string for block
+    """
+    bbox = b.get("block_bbox")
+    x1, y1, x2, y2 = bbox
+
+    left = int(x1)
+    top = int(y1)
+    width = int(x2 - x1)
+    height = int(y2 - y1)
+
+    label = b.get("block_label")
+    tag = LABEL_TO_TAG.get(label, "div")
+
+    if label in VISUAL_LABELS:
+        return render_visual(b, imgs_dir, output_dir)
+
+    content = b.get("block_content", "").strip()
+    inner = ""
+
+    if label in TITLE_LABELS:
+        content = content.strip("#").strip()
+
+    if label in FOOTNOTE_LABELS:
+        inner = content
+    elif label in HTML_WRAPPER_LABELS:
+        inner = escape_inner_html(content)
+    else:
+        inner = html.escape(content)
+
+    div = (
+        f'<{tag} class="block {label} auto-fit" '
+        f'style="left:{left}px;top:{top}px;width:{width}px;height:{height}px;">'
+        f'{inner}'
+        f'</{tag}>'
+    )
+
+    return div
+
+
+def build_html(blocks: list[dict], imgs_dir: Path, output_dir: Path) -> str:
+    """Build HTML from blocks using absolute positioning.
+
+    Args:
+        blocks: List of block dictionaries
+        imgs_dir: Path to images directory
+        output_dir: Path to output directory
+
+    Returns:
+        HTML string joining all block divs
+    """
+    new_blocks = []
+
+    for b in blocks:
+        div = build_block(b, imgs_dir, output_dir)
+        new_blocks.append(div)
+
+    return "\n".join(new_blocks)
 
 
 def render_visual(block: dict, imgs_dir: Path, output_dir: Path) -> str:
-    """Render visual block (image, chart, or table)."""
+    """Render visual block (image, chart, table) with absolute positioning."""
     label = block.get("block_label", "")
-    bbox = block.get("block_bbox")
+    bbox = block.get("block_bbox", [0, 0, 0, 0])
     content = block.get("block_content", "").strip()
+
+    x1, y1, x2, y2 = bbox
+
+    left = int(x1)
+    top = int(y1)
+    width = int(x2 - x1)
+    height = int(y2 - y1)
+
+    inner = ""
 
     if label in ("image", "chart"):
         img_path = find_image_file(imgs_dir, output_dir, bbox, label)
+
         if not img_path:
             alt_label = "chart" if label == "image" else "image"
             img_path = find_image_file(imgs_dir, output_dir, bbox, alt_label)
+
         if img_path:
-            return f'<img src="{img_path}" alt="{label}">\n'
+            inner = f'<img src="{img_path}" alt="{label}">'
+
+    elif label == "table":
+        inner = f'<div class="table-container">{content}</div>'
+
+    else:
         return ""
 
-    if label == "table":
-        return f'<div class="table-container">{content}</div>\n'
+    div = (
+        f'<div class="block {label}" '
+        f'style="left:{left}px;top:{top}px;width:{width}px;height:{height}px;">'
+        f'{inner}'
+        f'</div>\n'
+    )
 
-    return ""
-
-
-def group_blocks(blocks: list[dict]) -> list[dict]:
-    """Group visual blocks with captions into figure groups.
-
-    Rules:
-    - Visual (image/chart/table) opens buffer
-    - figure_title after visual -> sub-caption
-    - Two consecutive figure_titles -> parent caption, close group
-    - Other block -> close group if buffer is open
-    """
-    result = []
-    buffer = []
-    prev_label = None
-
-    def flush_buffer():
-        if not buffer:
-            return
-        visuals = [b for b in buffer if b["block_label"] in VISUAL_LABELS]
-        captions = [b for b in buffer if b["block_label"] in CAPTION_LABELS]
-        if visuals:
-            result.append(
-                {"type": "figure_group", "visuals": visuals, "captions": captions}
-            )
-        else:
-            for b in buffer:
-                result.append({"type": "single", "block": b})
-
-    for block in blocks:
-        label = block.get("block_label")
-
-        if label in VISUAL_LABELS:
-            buffer.append(block)
-            prev_label = label
-            continue
-
-        if label in CAPTION_LABELS and buffer:
-            if prev_label in CAPTION_LABELS:
-                # 2 captions consecutively -> parent caption, close group
-                buffer.append(block)
-                flush_buffer()
-                buffer = []
-                prev_label = None
-            else:
-                buffer.append(block)
-                prev_label = label
-            continue
-
-        # Other block -> close group if buffer open
-        flush_buffer()
-        buffer = []
-        prev_label = None
-        result.append({"type": "single", "block": block})
-
-    flush_buffer()
-    return result
-
-
-def render_figure_group(
-    group: dict, imgs_dir: Path, output_dir: Path
-) -> str:
-    """Render a grouped figure with visual(s) and caption(s)."""
-    visuals = group["visuals"]
-    captions = group["captions"]
-
-    sub_items = []
-    parent_caption = None
-
-    if len(captions) > 1 and len(visuals) > 1:
-        parent_caption = captions[-1]
-        sub_captions = captions[:-1]
-    elif len(captions) == 1:
-        # 1 caption with any number of visuals -> parent caption
-        parent_caption = captions[0]
-        sub_captions = []
-    elif len(visuals) == 1 and len(captions) == 0:
-        # 1 visual, no caption
-        parent_caption = None
-        sub_captions = []
-    else:
-        sub_captions = captions
-        parent_caption = None
-
-    caption_idx = 0
-    for v in visuals:
-        sub_cap = None
-        if caption_idx < len(sub_captions):
-            sub_cap = sub_captions[caption_idx]
-            caption_idx += 1
-        sub_items.append({"visual": v, "caption": sub_cap})
-
-    html = '<figure class="figure-group">\n'
-
-    if len(sub_items) > 1:
-        html += '<div class="figure-row">\n'
-        for item in sub_items:
-            html += '<div class="sub-figure">\n'
-            html += render_visual(item["visual"], imgs_dir, output_dir)
-            if item["caption"]:
-                html += _render_caption(item["caption"])
-            html += "</div>\n"
-        html += "</div>\n"
-    else:
-        item = sub_items[0]
-        html += render_visual(item["visual"], imgs_dir, output_dir)
-
-    if parent_caption:
-        html += _render_caption(parent_caption)
-
-    html += "</figure>\n"
-    return html
+    return div
 
 
 # ============== Main Functions ==============
@@ -280,86 +251,33 @@ def render_page_blocks(
     imgs_dir: Path,
     output_dir: Path,
 ) -> str:
-    """Render blocks to HTML (blocks already translated).
+    """Render page blocks to HTML using absolute positioning.
 
     Args:
-        page: PageData with translated blocks
+        page: PageData with blocks to render
         imgs_dir: Path to images directory
         output_dir: Path to output directory
 
     Returns:
-        HTML string for page blocks
+        HTML string for all blocks
     """
     blocks = page["parsing_res_list"]
-    # Sort by block_id
+    width = page.get("width", PAGE_W)
+    height = page.get("height", PAGE_H)
+
+    # Sort by block_id to maintain order
     blocks.sort(key=lambda b: b.get("block_id", float("inf")))
 
-    # Check for reference section
-    in_reference = False
-    for block in blocks:
-        if block.get("block_label") == "paragraph_title":
-            title_lower = block.get("block_content", "").lower().strip()
-            if any(kw in title_lower for kw in REFERENCE_KEYWORDS):
-                in_reference = True
-            else:
-                in_reference = False
-            break
+    # Render ALL blocks (no filtering)
+    html_blocks = build_html(blocks, imgs_dir=imgs_dir, output_dir=output_dir)
 
-    # Group visual blocks with captions
-    grouped = group_blocks(blocks)
+    page_html = f"""
+    <div class="page-container">
+        <div class="page"
+            style="width:{width}px;height:{height}px;">
+            {html_blocks}
+        </div>
+    </div>
+    """
 
-    # Render
-    html = ""
-    for item in grouped:
-        if item["type"] == "figure_group":
-            html += render_figure_group(item, imgs_dir, output_dir)
-        else:
-            block = item["block"]
-            label = block.get("block_label", "")
-            content = block.get("block_content", "").strip()
-            bbox = block.get("block_bbox")
-
-            # Check if should skip this block
-            action = should_translate(label, content)
-            if action == "skip":
-                continue
-
-            if in_reference and label == "text":
-                label = "reference_content"
-
-            # Skip empty content
-            if not content:
-                continue
-
-            style_attr = ' style="text-align: center;"' if label in CENTERED_LABELS else ""
-
-            if label in ("image", "chart"):
-                img_path = find_image_file(imgs_dir, output_dir, bbox, label)
-                if not img_path:
-                    alt_label = "chart" if label == "image" else "image"
-                    img_path = find_image_file(imgs_dir, output_dir, bbox, alt_label)
-                if img_path:
-                    html += f'<div class="{label}-container"{style_attr}><img src="{img_path}" alt="{label}"></div>\n'
-                continue
-
-            if label == "table":
-                html += f'<div class="table-container"{style_attr}>{content}</div>\n'
-                continue
-
-            if label == "display_formula":
-                # Fix LaTeX escaping: replace \\ with \ for MathJax
-                fixed_content = content.replace('\\\\', '\\')
-                html += f'<div class="display_formula"{style_attr}>{fixed_content}</div>\n'
-                continue
-
-            # Clean heading markers for doc_title and paragraph_title
-            display_content = content
-            if label in ("doc_title", "paragraph_title"):
-                # Remove Markdown heading markers (#, ##, ###)
-                display_content = content.lstrip('#').strip()
-
-            # Render text content (already translated)
-            tag = LABEL_TO_TAG.get(label, "p")
-            html += f'<{tag} class="{label}"{style_attr}>{display_content}</{tag}>\n'
-
-    return html
+    return page_html

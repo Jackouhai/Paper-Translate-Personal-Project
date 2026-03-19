@@ -52,6 +52,9 @@ class HTMLExporter(BaseExporter):
         mathjax_config = (
             self.templates_dir / "mathjax_config.html"
         ).read_text(encoding="utf-8")
+        dynamic_font_size = (
+            self.templates_dir / "dynamic_font_size.html"
+        ).read_text(encoding="utf-8")
 
         # Render pages
         pages_html = ""
@@ -67,6 +70,7 @@ class HTMLExporter(BaseExporter):
             title=f"Bản dịch {project_data['project_name']}",
             styles=styles,
             mathjax_config=mathjax_config,
+            dynamic_font_size= dynamic_font_size,
             content=pages_html,
         )
 
