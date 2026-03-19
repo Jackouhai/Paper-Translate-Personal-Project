@@ -11,3 +11,10 @@ wheels/
 .env
 output/
 
+# Documentation (local only)
+CLAUDE.md
+docs/
+
+# Other untracked
+pdf/
+
