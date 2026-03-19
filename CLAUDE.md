@@ -18,6 +18,7 @@ translator_engine_gemma.py - Old translator wrapper (Gemma)
 base.py                  - Base class từ PaddleX
 paddleocr_vl.py          - Wrapper PaddleOCR-VL
 server_manager.py        - Quản lý 2 servers với model switching
+demo_app.py             - Streamlit demo app
 start_server.sh          - Script khởi động 2 servers
 ```
 
@@ -104,17 +105,22 @@ uv run reconstruct_multi.py <project_dir>
 ### Server Manager CLI
 ```bash
 # Quản lý servers
-python demo/server_manager.py start-paddle    # Start PaddleOCR-VL
-python demo/server_manager.py start-gemma     # Start Gemma
-python demo/server_manager.py stop-paddle     # Stop PaddleOCR-VL
-python demo/server_manager.py stop-gemma      # Stop Gemma
-python demo/server_manager.py stop-all        # Stop cả 2
-python demo/server_manager.py switch paddle   # Switch sang PaddleOCR-VL
-python demo/server_manager.py switch gemma    # Switch sang Gemma
-python demo/server_manager.py status         # Xem status
+python server_manager.py start-paddle    # Start PaddleOCR-VL
+python server_manager.py start-gemma     # Start Gemma
+python server_manager.py stop-paddle     # Stop PaddleOCR-VL
+python server_manager.py stop-gemma      # Stop Gemma
+python server_manager.py stop-all        # Stop cả 2
+python server_manager.py switch paddle   # Switch sang PaddleOCR-VL
+python server_manager.py switch gemma    # Switch sang Gemma
+python server_manager.py status         # Xem status
 
 # Tự động switch model khi chạy full pipeline
 # (CLI tự động switch server khi cần)
+```
+
+### Streamlit Demo App
+```bash
+uv run streamlit run demo_app.py
 ```
 
 ## 🖥 Servers cần chạy
@@ -226,11 +232,10 @@ Tất cả kết quả lưu trong `output/<pdf_name>/`:
 
 ## 🔍 Status hiện tại
 
-- Git repo: Branch `refactor-1`, multiple commits
+- Git repo: Branch `refactor-1`, 2 commits
 - Python version: 3.12.9
 - Virtual environment: `.venv/` (đã cài dependencies)
-- Refactor Progress: Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 ✅, Phase 5 ✅, Phase 6 🔵 (3 tasks, 0% done)
-- Overall Progress: 86% (19/22 tasks complete)
+- Refactor Progress: Phase 1 ✅, Phase 2 ✅, Phase 3 ⏸ (templates có nhưng chưa dùng), Phase 4 ⏸ (CLI dùng old style), Phase 5 ⏸ (batch processing refactor)
 
 ---
 
@@ -266,50 +271,56 @@ OS: Linux 6.17.0-14-generic
 | Translation Policy | ✅ Done |
 | Utils (file_utils, path_utils) | ✅ Done |
 
-## ✅ Phase 3: Templates & Exporters Integration (DONE)
+## 🔵 Phase 3: Templates & Exporters Integration (PENDING - 9 Tasks Total)
 
+**Tasks:**
+1. Fix duplicate `__all__` in core/__init__.py
+2. Create renderer.py module (build_project_data, translate_page_data, render_page_blocks)
+3. Deprecate process_project() in reconstructor.py
+
+**Completed Items:**
 | Item | Status | Date |
 |------|--------|-------|
 | Templates (base.html, page.html, styles.html, mathjax_config.html) | ✅ Done | 2026-02-20 |
 | HTMLExporter with Jinja2 | ✅ Done | 2026-02-20 |
-| renderer.py module | ✅ Done | 2026-02-24 |
-| Deprecate process_project() | ✅ Done | 2026-02-24 |
 
-## ✅ Phase 4: CLI Integration (DONE)
+## 🔵 Phase 4: CLI Integration (PENDING)
 
-| Item | Status | Date |
-|------|--------|-------|
-| CLI (parse, translate, run commands) | ✅ Done | 2026-02-27 |
-| translate() command updated | ✅ Done | 2026-02-27 |
-| run() command updated | ✅ Done | 2026-02-27 |
-| core/__init__.py exports updated | ✅ Done | 2026-02-27 |
+**Tasks:**
+4. Update translate() command use renderer
+5. Update run() command use renderer
+6. Update core/__init__.py exports
 
-## ✅ Phase 5: Batch Processing Rewrite (DONE)
+**Completed Items:**
+| Item | Status |
+|------|--------|
+| CLI (parse, translate, run commands) | ✅ Done (uses old reconstructor) |
+
+## 🔵 Phase 5: Batch Processing Rewrite - Concurrent Requests (PENDING)
 
 **Approach:** ThreadPoolExecutor instead of asyncio (vLLM handles continuous batching automatically)
 
-| Item | Status | Date |
-|------|--------|-------|
-| max_concurrent_requests config added | ✅ Done | 2026-02-27 |
-| GemmaTranslator.__init__ updated | ✅ Done | 2026-02-27 |
-| translate_batch() rewritten with ThreadPoolExecutor | ✅ Done | 2026-02-27 |
-| Fixed duplicate translation bug | ✅ Done | 2026-02-27 |
+**Tasks:**
+7. Add max_concurrent_requests to config (default: 32)
+8. Update GemmaTranslator.__init__ use config
+9. Rewrite translate_batch() use ThreadPoolExecutor
 
-## 🔵 Phase 6: Additional Features (PENDING)
+**Current Issues:**
+- translate_batch() groups all texts into one request (incorrect)
+- Complex response parsing is unreliable
+- Does NOT utilize vLLM's concurrent requests
+- max_tokens * len(non_empty) is too large
 
-| Task | Description | Status | Priority |
-|------|-------------|--------|----------|
-| Clean up old scripts | Remove legacy scripts in root directory | 🔵 Pending | MEDIUM |
-| PDF exporter | Export to PDF format | 🔵 Pending | LOW |
-| Improve documentation | Update docs for Phase 1-5 | 🔵 Pending | LOW |
+## 📝 Vấn đề còn lại
 
-## 📝 Tất cả issues đã giải quyết ✅
-
-Tất cả các vấn đề trong Phase 3-5 đã được giải quyết:
-- ✅ Templates đang được sử dụng
-- ✅ CLI đang dùng renderer và HTMLExporter
-- ✅ translate_batch() đang dùng ThreadPoolExecutor
-- ✅ Không có duplicate translation bug
+| Vấn đề | Mô tả | Priority | Phase |
+|--------|---------|----------|-------|
+| Duplicate `__all__` in core/__init__.py | Lines 4 & 6 duplicate | LOW | Phase 3 |
+| reconstructor.py uses string concatenation | Not Jinja2 templates | HIGH | Phase 3 |
+| Templates created but not used | base.html, page.html not called | HIGH | Phase 3 |
+| CLI doesn't use HTMLExporter | Still uses process_project() | HIGH | Phase 4 |
+| translate_batch() sends all in 1 request | Should be concurrent requests | HIGH | Phase 5 |
+| Complex response parsing | Unreliable parsing | HIGH | Phase 5 |
 
 ## 📌 Session hiện tại
 
@@ -324,20 +335,26 @@ Tất cả các vấn đề trong Phase 3-5 đã được giải quyết:
 |-------|--------|------------|
 | Phase 1: Foundation | ✅ Done | 100% |
 | Phase 2: Core Logic | ✅ Done | 100% |
-| Phase 3: Templates & Exporters Integration | ✅ Done | 100% |
-| Phase 4: CLI Integration | ✅ Done | 100% |
-| Phase 5: Batch Processing Rewrite | ✅ Done | 100% |
-| Phase 6: Additional Features | 🔵 Pending | 0% (3 tasks) |
+| Phase 3: Templates & Exporters Integration | 🔵 Pending | 40% (2/5 items done, 3 tasks pending) |
+| Phase 4: CLI Integration | 🔵 Pending | 33% (1/3 items done, 2 tasks pending) |
+| Phase 5: Batch Processing Rewrite | 🔵 Pending | 0% (3 tasks pending) |
+| Phase 6: Additional Features | 🔵 Pending | 0% |
 
-### Next Steps (Session 2026-03-16)
+### Next Steps (Session 2026-02-20 Refactor Plan)
 
-**Phase 6 Tasks:**
+**Bắt đầu từ đơn giản nhất:**
 
-1. **Clean up old scripts** (MEDIUM) - Remove legacy scripts in root directory
-2. **PDF exporter** (LOW) - Export to PDF format
-3. **Improve documentation** (LOW) - Update docs for Phase 1-5 ✅
+1. **Task #1** (Phase 3): Fix duplicate `__all__` in `core/__init__.py` - 2 lines change
+2. **Task #2** (Phase 3): Create `renderer.py` module with build_project_data, translate_page_data, render_page_blocks
+3. **Task #3** (Phase 3): Deprecate process_project() in reconstructor.py
+4. **Task #4** (Phase 4): Update translate() command use renderer
+5. **Task #5** (Phase 4): Update run() command use renderer
+6. **Task #6** (Phase 4): Update core/__init__.py exports
+7. **Task #7** (Phase 5): Add max_concurrent_requests to config
+8. **Task #8** (Phase 5): Update GemmaTranslator.__init__ use config
+9. **Task #9** (Phase 5): Rewrite translate_batch() use ThreadPoolExecutor
 
 **See full details in:** `docs/CLAUDE.md`, `docs/PLANNING.md`, `docs/STATE.md`
 
 ---
-**Cập nhật lần cuối:** 2026-03-16 (Phase 6 Updated)
+**Cập nhật lần cuối:** 2026-02-20 (Refactor Plan Created)

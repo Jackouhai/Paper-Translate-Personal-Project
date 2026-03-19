@@ -12,42 +12,17 @@
 - Tôi chỉ kiểm tra lại sau khi bạn code xong
 - Không auto-write code, chỉ gợi ý và review
 
-### Workflow Guidelines (QUAN TRỌNG)
+### Session: 2026-02-20 - Refactor Plan Implementation
 
-**TRƯỚC KHI SỬA BẤT KỲ FILE:**
-1. Gợi ý nội dung sửa đổi
-2. Hỏi ý kiến người dùng: "Bạn có đồng ý với thay đổi này không?"
-3. Chờ xác nhận từ người dùng
-4. Mới thực hiện sửa file
+**Focus:** Hoàn thành refactor pipeline:
+1. **Phase 3**: Templates & Exporters Integration (Jinja2)
+2. **Phase 4**: CLI Integration (sử dụng HTMLExporter)
+3. **Phase 5**: Batch Processing Rewrite (concurrent requests)
 
-**KHÔNG ĐƯỢC:**
-- ❌ Tự ý sửa file mà không hỏi trước
-- ❌ Giả định yêu cầu là lệnh trực tiếp
-- ❌ Bypass quy trình confirm trong Learning Mode
-
-**NỘI DUNG GỢI Ý CẦN BAO GỒM:**
-- File nào sẽ bị ảnh hưởng
-- Nội dung thay đổi cụ thể
-- Lý do thay đổi
-- Hỏi người dùng có đồng ý không
-
-**LÝ DO:**
-- Trong Learning Mode, người dùng cần kiểm soát mọi thay đổi
-- Tránh sửa nhầm hoặc sửa những gì người dùng không muốn
-- Giữ transparency trong quá trình làm việc
-
-### Session: 2026-03-16 - Phase 6 Update & Documentation
-
-**Focus:** Cập nhật Phase 6 và hoàn thiện documentation:
-1. **Phase 6 Update**: Bỏ HY-MT translator và Parallel project processing
-2. **Documentation**: Cập nhật docs cho Phase 1-5 đã hoàn thành
-
-**Phase 6 mới:**
-- Clean up old scripts (MEDIUM)
-- PDF exporter (LOW)
-- Improve documentation (LOW)
-
-**Phase 1-5: All completed ✅ (19 tasks)**
+**Approach mới cho Phase 5:**
+- Sử dụng `ThreadPoolExecutor` thay vì `asyncio`
+- vLLM tự động handle continuous batching
+- Mỗi request = 1 translation task
 
 ---
 
@@ -90,14 +65,6 @@
 | 9 | Rewrite translate_batch() use ThreadPoolExecutor | ✅ Done | User | `src/pp_doclayout/translators/gemma.py` | 2026-02-27 |
 | 10 | Fix translate_page_data() use translate_batch() | ✅ Done | User | `src/pp_doclayout/core/renderer.py` | 2026-02-27 |
 | 11 | Remove duplicate translation from render_page_blocks() | ✅ Done | User | `src/pp_doclayout/core/renderer.py`, `src/pp_doclayout/cli.py` | 2026-02-27 |
-
-### Phase 6: Additional Features
-
-| # | Task | Description | Status | Priority | Date |
-|---|-------|-------------|--------|----------|-------|
-| | Clean up old scripts | Remove legacy scripts in root directory (main.py, reconstruct_*.py, etc.) | 🔵 Pending | MEDIUM | - |
-| | PDF exporter | Export to PDF format (beyond HTML) | 🔵 Pending | LOW | - |
-| | Improve documentation | Update docs for Phase 1-5 completion | 🔵 Pending | LOW | - |
 
 ---
 
@@ -259,15 +226,6 @@ Khi hoàn thành 1 task:
 
 ## 🔗 Session History
 
-### 2026-03-16
-- **Phase 6 Updated!** Removed HY-MT translator and Parallel project processing from scope
-- New Phase 6 tasks:
-  - Clean up old scripts (MEDIUM)
-  - PDF exporter (LOW)
-  - Improve documentation (LOW)
-- Updated documentation for Phase 1-5 completion
-- Overall progress: 86% (19/22 tasks complete)
-
 ### 2026-02-27 (late evening)
 - **Fixed duplicate translation bug!** Removed translation from render functions:
   - Task #10: Fixed translate_page_data() to use translate_batch() (was using translate() per block)
@@ -301,4 +259,4 @@ Khi hoàn thành 1 task:
 ---
 
 **Session started:** 2026-02-20
-**Last updated:** 2026-03-16
+**Last updated:** 2026-02-27
