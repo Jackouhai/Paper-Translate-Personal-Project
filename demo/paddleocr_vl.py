@@ -21,7 +21,6 @@ from .._utils.cli import (
 from .base import PaddleXPipelineWrapper, PipelineCLISubcommandExecutor
 from .utils import create_config_from_structure
 
-
 _AVAILABLE_PIPELINE_VERSIONS = ["v1", "v1.5"]
 _DEFAULT_PIPELINE_VERSION = "v1.5"
 _SUPPORTED_VL_BACKENDS = [

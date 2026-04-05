@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pp_doclayout.config import settings
+from ..config import settings
 
 
 def get_output_dir() -> Path:

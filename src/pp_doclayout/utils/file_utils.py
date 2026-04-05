@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Optional
 
-from pp_doclayout.config import settings
+from ..config import settings
 
 
 def ensure_dir(path: Path | str) -> Path:

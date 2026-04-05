@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from ..policies.translation_policy import should_translate
 from ..types import Block, PageData, ProjectData, BlockLabel
+from ..utils import find_image_file
 
 if TYPE_CHECKING:
     from ..translators.base import BaseTranslator
@@ -38,18 +39,6 @@ PAGE_H = 1584
 
 
 # ============== Helper Functions ==============
-def find_image_file(
-    imgs_dir: Path, output_dir: Path, bbox: list, label: str
-) -> str | None:
-    """Image detection based on bbox."""
-    x1, y1, x2, y2 = (int(v) for v in bbox)
-    pattern = f"*{x1}_{y1}_{x2}_{y2}.jpg"
-    files = list(imgs_dir.glob(pattern))
-    if files:
-        return str(files[0].relative_to(output_dir))
-    return None
-
-
 def escape_inner_html(content: str) -> str:
     """Escape inner HTML content while preserving outer tags."""
     m = re.match(r"(<[^>]+>)(.*?)(</[^>]+>)", content, re.DOTALL)

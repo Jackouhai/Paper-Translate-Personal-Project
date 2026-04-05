@@ -2,8 +2,8 @@ import typer
 from pathlib import Path
 from typing import Optional
 
-from pp_doclayout.translators import get_gemma
-from pp_doclayout.config import settings
+from src.pp_doclayout.translators import get_gemma
+from src.pp_doclayout.config import settings
 
 app = typer.Typer(
     name="ppdoc",
