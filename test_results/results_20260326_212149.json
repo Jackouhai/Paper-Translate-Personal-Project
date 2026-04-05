@@ -1,0 +1,56 @@
+{
+  "summary": {
+    "timestamp": "2026-03-26T21:21:49.950496",
+    "total_requests": 5,
+    "success_count": 0,
+    "success_rate": 0.0,
+    "avg_time": 0.002720928192138672
+  },
+  "results": [
+    {
+      "test_id": 1,
+      "page": 1,
+      "status": "http_404",
+      "elapsed_time": 0.002687215805053711,
+      "endpoint_used": "/queue/join",
+      "error": "No endpoint worked. Tried: ['/api/process_page', '/queue/join']",
+      "response_data": null
+    },
+    {
+      "test_id": 4,
+      "page": 4,
+      "status": "http_404",
+      "elapsed_time": 0.002616405487060547,
+      "endpoint_used": "/queue/join",
+      "error": "No endpoint worked. Tried: ['/api/process_page', '/queue/join']",
+      "response_data": null
+    },
+    {
+      "test_id": 5,
+      "page": 5,
+      "status": "http_404",
+      "elapsed_time": 0.0026903152465820312,
+      "endpoint_used": "/queue/join",
+      "error": "No endpoint worked. Tried: ['/api/process_page', '/queue/join']",
+      "response_data": null
+    },
+    {
+      "test_id": 3,
+      "page": 3,
+      "status": "http_404",
+      "elapsed_time": 0.002610921859741211,
+      "endpoint_used": "/queue/join",
+      "error": "No endpoint worked. Tried: ['/api/process_page', '/queue/join']",
+      "response_data": null
+    },
+    {
+      "test_id": 2,
+      "page": 2,
+      "status": "http_404",
+      "elapsed_time": 0.0029997825622558594,
+      "endpoint_used": "/queue/join",
+      "error": "No endpoint worked. Tried: ['/api/process_page', '/queue/join']",
+      "response_data": null
+    }
+  ]
+}
