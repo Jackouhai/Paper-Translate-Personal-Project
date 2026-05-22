@@ -52,11 +52,11 @@ class Settings(BaseSettings):
         description="Format block content (LaTeX, math, table)"
     )
     paddle_ocr_use_doc_unwarping: bool = Field(
-        default=True,
+        default=False,
         description="Use document unwarping (deskew, straighten)"
     )
     paddle_ocr_use_chart_recognition: bool = Field(
-        default=True,
+        default=False,
         description="Parse charts separately"
     )
     paddle_ocr_merge_layout_blocks: bool = Field(

@@ -1,6 +1,8 @@
 """Type definitions for PP-DocLayout."""
 
-from typing import Literal, TypedDict, NotRequired
+from typing import Literal
+
+from typing_extensions import TypedDict, NotRequired
 
 # ============== Actions ==============
 TranslateAction = Literal["translate", "keep", "skip"]

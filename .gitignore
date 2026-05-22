@@ -12,6 +12,9 @@ wheels/
 output/
 
 # Documentation (local only)
+CLAUDE.md
+PLAN.md
+
 
 # Other untracked
 pdf/

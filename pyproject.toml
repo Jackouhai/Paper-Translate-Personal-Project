@@ -1,10 +1,35 @@
 [project]
-name = "pp-doclayout"
+name = "pp-doclayout-test"
 version = "0.1.0"
 description = "Pipeline dịch paper học thuật sang tiếng Việt"
 readme = "README.md"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10"
 dependencies = [
+    "paddlepaddle-gpu==3.3.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "python-multipart>=0.0.9",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "openai>=1.0",
+    "jinja2>=3.1",
+    "typer>=0.9",
+    "tiktoken>=0.7",
+    "slowapi>=0.1.9",
+    "python-json-logger>=2.0",
+    "bitsandbytes",
+    "vllm>=0.16.0",
+    "pypdf",
+    "paddleocr>=3.4.0",
+    "paddlex[ocr]>=3.4.3",
+    "typing-extensions>=4.15.0",
 ]
 
+[[tool.uv.index]]
+url = "https://www.paddlepaddle.org.cn/packages/stable/cu130/"
 
+[tool.uv]
+environments = ["sys_platform == 'linux'"] 
+
+[project.scripts]
+pp-doclayout = "pp_doclayout.cli:main"

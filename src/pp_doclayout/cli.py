@@ -2,8 +2,8 @@ import typer
 from pathlib import Path
 from typing import Optional
 
-from src.pp_doclayout.translators import get_gemma
-from src.pp_doclayout.config import settings
+from pp_doclayout.translators import get_gemma
+from pp_doclayout.config import settings
 
 app = typer.Typer(
     name="ppdoc",
@@ -92,7 +92,7 @@ def translate(
     - Figure/table captions
     """
     from pp_doclayout.core.renderer import build_project_data, translate_page_data, render_page_blocks
-    from pp_doclayout.exporters import HTMLExporter
+    from pp_doclayout.exporters.html import HTMLExporter
 
     translator = get_gemma()
     # 1. Build project data from JSON files
@@ -182,7 +182,7 @@ def run(
     # Step 2: Translate
     typer.echo("\n=== Step 2: Translate ===")
     from pp_doclayout.core.renderer import build_project_data, translate_page_data, render_page_blocks
-
+    from pp_doclayout.exporters.html import HTMLExporter
     translator = get_gemma()
 
     # 1. Build project data from JSON files
