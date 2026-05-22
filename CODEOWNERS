@@ -1,0 +1,9 @@
+# Default owners
+*       @Jackouhai
+
+# Source code
+/src/   @Jackouhai
+
+# Config & dependencies
+/pyproject.toml  @Jackouhai
+/uv.lock         @Jackouhai
