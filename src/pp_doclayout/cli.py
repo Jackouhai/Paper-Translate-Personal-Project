@@ -92,7 +92,6 @@ def translate(
     - Figure/table captions
     """
     from pp_doclayout.core.renderer import build_project_data, translate_page_data, render_page_blocks
-    from pp_doclayout.exporters.html import HTMLExporter
 
     translator = get_gemma()
     # 1. Build project data from JSON files
@@ -113,12 +112,19 @@ def translate(
 
     project_data["pages"] = translated_pages
 
-    # 4. Export to HTML using HTMLExporter
-    exporter = HTMLExporter()
-    output_path = project_dir / f"{output_suffix}_{project_data['project_name']}.html"
+    # 4. Export
+    if export_format == "pdf":
+        from pp_doclayout.exporters.pdf import PDFExporter
+        exporter = PDFExporter()
+        ext = "pdf"
+    else:
+        from pp_doclayout.exporters.html import HTMLExporter
+        exporter = HTMLExporter()
+        ext = "html"
+    output_path = project_dir / f"{output_suffix}_{project_data['project_name']}.{ext}"
     exporter.export(project_data, output_path)
 
-    typer.echo(f"✓ HTML created: {output_path}")
+    typer.echo(f"✓ {ext.upper()} created: {output_path}")
 
 
 @app.command()
@@ -182,7 +188,6 @@ def run(
     # Step 2: Translate
     typer.echo("\n=== Step 2: Translate ===")
     from pp_doclayout.core.renderer import build_project_data, translate_page_data, render_page_blocks
-    from pp_doclayout.exporters.html import HTMLExporter
     translator = get_gemma()
 
     # 1. Build project data from JSON files
@@ -202,13 +207,23 @@ def run(
 
     project_data["pages"] = translated_pages
 
-    # 4. Export to HTML using HTMLExporter
-    exporter = HTMLExporter()
-    output_path = project_dir / f"{output_suffix}_{project_data['project_name']}.html"
+    # 4. Export
+    if export_format == "pdf":
+        from pp_doclayout.exporters.pdf import PDFExporter
+        exporter = PDFExporter()
+        ext = "pdf"
+    else:
+        from pp_doclayout.exporters.html import HTMLExporter
+        exporter = HTMLExporter()
+        ext = "html"
+    output_path = project_dir / f"{output_suffix}_{project_data['project_name']}.{ext}"
     exporter.export(project_data, output_path)
 
-    typer.echo(f"✓ HTML created: {output_path}")
+    typer.echo(f"✓ {ext.upper()} created: {output_path}")
+
+def main():
+    app()
 
 
 if __name__ == "__main__":
-    app()
+    main()

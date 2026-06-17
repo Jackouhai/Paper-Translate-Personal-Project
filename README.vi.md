@@ -13,6 +13,7 @@ Pipeline dịch tài liệu học thuật PDF sang tiếng Việt, giữ nguyên
 - **Dịch thuật** — TranslateGemma 4B chạy locally trên GPU qua vLLM
 - **Translation Policy** — giữ nguyên tiêu đề, references, công thức, chỉ dịch nội dung chính
 - **HTML Output** — absolute positioning, MathJax render công thức
+- **PDF Export** — xuất PDF qua headless Chrome (Playwright)
 
 ## Quick Start
 
@@ -20,13 +21,42 @@ Pipeline dịch tài liệu học thuật PDF sang tiếng Việt, giữ nguyên
 >
 > **VRAM:** ~4-8GB chạy từng bước, ~16GB cho full pipeline (cả 2 servers cùng lúc)
 
+### PaddlePaddle Wheel
+
+Trước khi cài, kiểm tra GPU và compute capability:
+
+```bash
+nvidia-smi
+python3 -c "import subprocess; print(subprocess.check_output(['nvidia-smi', '--query-gpu=name,compute_cap', '--format=csv,noheader'], text=True))"
+```
+
+PaddlePaddle GPU yêu cầu compute capability lớn hơn 7.5. Nếu GPU không đạt yêu cầu này, cần dùng máy NVIDIA GPU/CUDA phù hợp khác trước khi chạy local pipeline.
+
+`pyproject.toml` mặc định dùng `cu130`. Nếu máy cần wheel khác, sửa PaddlePaddle index trước khi chạy `uv sync`:
+
+| CUDA wheel | PaddlePaddle index URL |
+|------------|-------------------------|
+| CUDA 13.0 | `https://www.paddlepaddle.org.cn/packages/stable/cu130/` |
+| CUDA 12.9 | `https://www.paddlepaddle.org.cn/packages/stable/cu129/` |
+| CUDA 12.6 | `https://www.paddlepaddle.org.cn/packages/stable/cu126/` |
+| CUDA 11.8 | `https://www.paddlepaddle.org.cn/packages/stable/cu118/` |
+
 ```bash
 # 1. Cài đặt
 git clone <repo_url> && cd Paper-Translate-Personal-Project
 uv sync
 uv pip install -e .
 
-# 2. Khởi động PaddleOCR-VL (Terminal 1, port 8000)
+# 2. Kiểm tra PaddlePaddle
+uv run python scripts/check_paddle_env.py
+
+# 3. Cài Playwright (để xuất PDF)
+uv run playwright install chromium
+# Nếu Playwright không cài được Chromium, cài Google Chrome thủ công:
+# wget -q -O /tmp/google-chrome.deb "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
+# sudo dpkg -i /tmp/google-chrome.deb && sudo apt-get install -f -y
+
+# 4. Khởi động PaddleOCR-VL (Terminal 1, port 8000)
 vllm serve PaddlePaddle/PaddleOCR-VL-1.5 \
     --served-model-name PaddleOCR-VL-1.5-0.9B \
     --trust-remote-code \
@@ -39,7 +69,7 @@ vllm serve PaddlePaddle/PaddleOCR-VL-1.5 \
     --no-enable-prefix-caching \
     --mm-processor-cache-gb 0
 
-# 3. Khởi động TranslateGemma (Terminal 2, port 8001)
+# 5. Khởi động TranslateGemma (Terminal 2, port 8001)
 vllm serve Infomaniak-AI/vllm-translategemma-4b-it \
     --dtype bfloat16 \
     --quantization bitsandbytes \
@@ -52,11 +82,23 @@ vllm serve Infomaniak-AI/vllm-translategemma-4b-it \
     --enforce-eager \
     --port 8001
 
-# 4. Chạy
+# 6. Chạy
 uv run -m pp_doclayout.cli run paper.pdf
 ```
 
+Nếu kiểm tra PaddlePaddle fail, sửa Paddle/CUDA trước khi chạy `parse` hoặc `run`.
+
 Output: `output/paper/translated_paper.html`
+
+```bash
+# Xuất PDF thay vì HTML
+uv run -m pp_doclayout.cli run paper.pdf -f pdf
+
+# Hoặc dịch dữ liệu đã parse sang PDF
+uv run -m pp_doclayout.cli translate output/paper -f pdf
+```
+
+Output: `output/paper/translated_paper.pdf`
 
 ---
 
@@ -85,26 +127,35 @@ Kết quả lưu tại `output/<tên_file>/`:
 Cần TranslateGemma server (port 8001).
 
 ```bash
+# Xuất HTML (mặc định)
 uv run -m pp_doclayout.cli translate output/<tên_file>
+
+# Xuất PDF
+uv run -m pp_doclayout.cli translate output/<tên_file> -f pdf
 
 # Hậu tố file tùy chỉnh
 uv run -m pp_doclayout.cli translate output/<tên_file> --suffix vi
 ```
 
-Kết quả: `output/<tên_file>/translated_<tên_file>.html`
+Kết quả: `output/<tên_file>/translated_<tên_file>.html` hoặc `.pdf`
 
 ### Full Pipeline
 
 Chạy parse + translate trong 1 lệnh. Cần cả 2 servers chạy cùng lúc.
 
 ```bash
+# Xuất HTML (mặc định)
 uv run -m pp_doclayout.cli run <file.pdf>
+
+# Xuất PDF
+uv run -m pp_doclayout.cli run <file.pdf> -f pdf
 ```
 
 ### Xem kết quả
 
 ```bash
-xdg-open output/<tên_file>/translated_<tên_file>.html
+xdg-open output/<tên_file>/translated_<tên_file>.html   # HTML
+xdg-open output/<tên_file>/translated_<tên_file>.pdf    # PDF
 ```
 
 ## Models
@@ -142,7 +193,8 @@ src/pp_doclayout/
 │   └── renderer.py             # Build/translate/render → HTML
 ├── exporters/
 │   ├── base.py                 # Abstract BaseExporter
-│   └── html.py                 # HTMLExporter (Jinja2)
+│   ├── html.py                 # HTMLExporter (Jinja2)
+│   └── pdf.py                  # PDFExporter (Playwright)
 ├── policies/
 │   └── translation_policy.py   # Logic dịch/giữ/skip
 ├── translators/
