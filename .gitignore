@@ -10,10 +10,12 @@ wheels/
 .venv
 .env
 output/
+input/
 
 # Documentation (local only)
 CLAUDE.md
 PLAN.md
+AGENTS.md
 
 
 # Other untracked
