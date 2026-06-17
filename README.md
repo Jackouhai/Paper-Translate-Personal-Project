@@ -13,7 +13,6 @@ Academic PDF translation pipeline — English to Vietnamese, preserving original
 - **Translation** — TranslateGemma 4B running locally on GPU via vLLM
 - **Smart Policy** — preserve titles, references, formulas; only translate main content
 - **HTML Output** — absolute positioning, MathJax formula rendering
-- **PDF Export** — headless Chrome rendering via Playwright
 
 ## Quick Start
 
@@ -21,42 +20,13 @@ Academic PDF translation pipeline — English to Vietnamese, preserving original
 >
 > **VRAM:** ~4-8GB step-by-step, ~16GB for full pipeline (both servers at once)
 
-### PaddlePaddle Wheel
-
-Before installing, check the GPU and compute capability:
-
-```bash
-nvidia-smi
-python3 -c "import subprocess; print(subprocess.check_output(['nvidia-smi', '--query-gpu=name,compute_cap', '--format=csv,noheader'], text=True))"
-```
-
-PaddlePaddle GPU requires compute capability greater than 7.5. If your GPU does not meet this requirement, use another NVIDIA GPU/CUDA machine before running the local pipeline.
-
-`pyproject.toml` defaults to `cu130`. Change the PaddlePaddle index before `uv sync` if your machine needs another wheel:
-
-| CUDA wheel | PaddlePaddle index URL |
-|------------|-------------------------|
-| CUDA 13.0 | `https://www.paddlepaddle.org.cn/packages/stable/cu130/` |
-| CUDA 12.9 | `https://www.paddlepaddle.org.cn/packages/stable/cu129/` |
-| CUDA 12.6 | `https://www.paddlepaddle.org.cn/packages/stable/cu126/` |
-| CUDA 11.8 | `https://www.paddlepaddle.org.cn/packages/stable/cu118/` |
-
 ```bash
 # 1. Install
 git clone <repo_url> && cd Paper-Translate-Personal-Project
 uv sync
 uv pip install -e .
 
-# 2. Verify PaddlePaddle
-uv run python scripts/check_paddle_env.py
-
-# 3. Install Playwright (for PDF export)
-uv run playwright install chromium
-# If Playwright can't install Chromium, install Google Chrome manually:
-# wget -q -O /tmp/google-chrome.deb "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
-# sudo dpkg -i /tmp/google-chrome.deb && sudo apt-get install -f -y
-
-# 4. Start PaddleOCR-VL server (Terminal 1, port 8000)
+# 2. Start PaddleOCR-VL server (Terminal 1, port 8000)
 vllm serve PaddlePaddle/PaddleOCR-VL-1.5 \
     --served-model-name PaddleOCR-VL-1.5-0.9B \
     --trust-remote-code \
@@ -69,7 +39,7 @@ vllm serve PaddlePaddle/PaddleOCR-VL-1.5 \
     --no-enable-prefix-caching \
     --mm-processor-cache-gb 0
 
-# 5. Start TranslateGemma server (Terminal 2, port 8001)
+# 3. Start TranslateGemma server (Terminal 2, port 8001)
 vllm serve Infomaniak-AI/vllm-translategemma-4b-it \
     --dtype bfloat16 \
     --quantization bitsandbytes \
@@ -82,23 +52,11 @@ vllm serve Infomaniak-AI/vllm-translategemma-4b-it \
     --enforce-eager \
     --port 8001
 
-# 6. Run
+# 4. Run
 uv run -m pp_doclayout.cli run paper.pdf
 ```
 
-If PaddlePaddle verification fails, fix Paddle/CUDA before running `parse` or `run`.
-
 Output: `output/paper/translated_paper.html`
-
-```bash
-# Export as PDF instead
-uv run -m pp_doclayout.cli run paper.pdf -f pdf
-
-# Or translate existing parsed data to PDF
-uv run -m pp_doclayout.cli translate output/paper -f pdf
-```
-
-Output: `output/paper/translated_paper.pdf`
 
 ---
 
@@ -127,35 +85,26 @@ Output saved to `output/<filename>/`:
 Needs TranslateGemma server (port 8001).
 
 ```bash
-# HTML output (default)
 uv run -m pp_doclayout.cli translate output/<filename>
-
-# PDF output
-uv run -m pp_doclayout.cli translate output/<filename> -f pdf
 
 # Custom output suffix
 uv run -m pp_doclayout.cli translate output/<filename> --suffix vi
 ```
 
-Output: `output/<filename>/translated_<filename>.html` or `.pdf`
+Output: `output/<filename>/translated_<filename>.html`
 
 ### Full Pipeline
 
 Parse + translate in one command. Requires both servers running.
 
 ```bash
-# HTML output (default)
 uv run -m pp_doclayout.cli run <file.pdf>
-
-# PDF output
-uv run -m pp_doclayout.cli run <file.pdf> -f pdf
 ```
 
 ### View result
 
 ```bash
-xdg-open output/<filename>/translated_<filename>.html   # HTML
-xdg-open output/<filename>/translated_<filename>.pdf    # PDF
+xdg-open output/<filename>/translated_<filename>.html
 ```
 
 ## Models
@@ -193,8 +142,7 @@ src/pp_doclayout/
 │   └── renderer.py             # Build/translate/render → HTML
 ├── exporters/
 │   ├── base.py                 # Abstract BaseExporter
-│   ├── html.py                 # HTMLExporter (Jinja2)
-│   └── pdf.py                  # PDFExporter (Playwright)
+│   └── html.py                 # HTMLExporter (Jinja2)
 ├── policies/
 │   └── translation_policy.py   # Translate/keep/skip logic
 ├── translators/

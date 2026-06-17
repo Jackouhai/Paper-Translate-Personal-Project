@@ -10,12 +10,12 @@
         startSize = 24;
         minSize = 14;
         maxSize = 40;
-    }
+    } 
     else if (cls.includes("figure_title") || cls.includes("table_caption")) {
         startSize = 16;
         minSize = 10;
         maxSize = 24;
-    }
+    } 
     else if (cls.includes("abstract")) {
         startSize = 16;
         minSize = 9;
@@ -24,17 +24,6 @@
 
     el.style.fontSize = startSize + "px";
 
-    // Shrink phase: coarse 1px steps
-    while (
-        (el.scrollHeight > el.clientHeight ||
-        el.scrollWidth > el.clientWidth) &&
-        startSize > minSize
-    ){
-        startSize -= 1;
-        el.style.fontSize = startSize + "px";
-    }
-
-    // Shrink phase: fine 0.5px if still overflowing
     while (
         (el.scrollHeight > el.clientHeight ||
         el.scrollWidth > el.clientWidth) &&
@@ -44,7 +33,6 @@
         el.style.fontSize = startSize + "px";
     }
 
-    // Grow phase: try to fill space
     while (
         el.scrollHeight <= el.clientHeight &&
         el.scrollWidth <= el.clientWidth &&

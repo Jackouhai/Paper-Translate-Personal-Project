@@ -22,15 +22,13 @@ dependencies = [
     "paddleocr>=3.4.0",
     "paddlex[ocr]>=3.4.3",
     "typing-extensions>=4.15.0",
-    "bitsandbytes",
-    "playwright>=1.60.0",
-    "torch-c-dlpack-ext>=0.1.5",
+    "bitsandbytes"
 ]
 
 [[tool.uv.index]]
 name = "paddlepaddle"
 url = "https://www.paddlepaddle.org.cn/packages/stable/cu130/"
-    
+
 [[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple/"
@@ -41,11 +39,6 @@ environments = ["sys_platform == 'linux'"]
 index-strategy = "unsafe-best-match"
 [tool.uv.sources]
 paddlepaddle-gpu = { index = "paddlepaddle" } 
-
-[dependency-groups]
-dev = [
-    "pytest>=9.0.3",
-]
 
 [project.scripts]
 pp-doclayout = "pp_doclayout.cli:main"

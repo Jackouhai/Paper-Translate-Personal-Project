@@ -27,7 +27,7 @@ BlockLabel = Literal[
     "reference_content",
     "footnote",
     "vision_footnote",
-    # Noise
+    # Noise / metadata
     "aside_text",
     "header",
     "footer",

@@ -33,18 +33,6 @@ class Settings(BaseSettings):
         default=16384,
         description="Maximum tokens for generation"
     )
-    vllm_min_output_tokens: int = Field(
-        default=512,
-        description="Minimum max_tokens for a translation request"
-    )
-    vllm_output_token_multiplier: float = Field(
-        default=2.5,
-        description="Estimated output token multiplier based on input length"
-    )
-    vllm_retry_attempts: int = Field(
-        default=2,
-        description="Number of retry attempts for failed translation requests"
-    )
     vllm_model_name: str = Field(
         default="Infomaniak-AI/vllm-translategemma-4b-it",
         description="Model name for vLLM"
@@ -86,6 +74,20 @@ class Settings(BaseSettings):
     paddle_use_ocr_for_image_block: bool = Field(
         default=True,
         description="OCR for images"
+    )
+
+    # ===== Batch Processing Settings =====
+    batch_size_small: int = Field(
+        default=16,
+        description="Batch size for small texts (<100 tokens)"
+    )
+    batch_size_medium: int = Field(
+        default=8,
+        description="Batch size for medium texts (100-500 tokens)"
+    )
+    batch_size_large: int = Field(
+        default=4,
+        description="Batch size for large texts (>500 tokens)"
     )
 
     # ===== Concurrent Request Settings =====
