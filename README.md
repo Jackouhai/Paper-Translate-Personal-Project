@@ -50,11 +50,16 @@ uv pip install -e .
 # 2. Verify PaddlePaddle
 uv run python scripts/check_paddle_env.py
 
-# 3. Install Playwright (for PDF export)
+# 3. Install a browser for Playwright PDF export
 uv run playwright install chromium
-# If Playwright can't install Chromium, install Google Chrome manually:
+
+# If Playwright-managed Chromium is unavailable, install Google Chrome:
 # wget -q -O /tmp/google-chrome.deb "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
-# sudo dpkg -i /tmp/google-chrome.deb && sudo apt-get install -f -y
+# sudo apt install /tmp/google-chrome.deb
+#
+# Then configure PP-DocLayout to use the system Chrome channel:
+# cp .env.example .env
+# echo "PPDOCLAYOUT_PLAYWRIGHT_BROWSER_CHANNEL=chrome" >> .env
 
 # 4. Start PaddleOCR-VL server (Terminal 1, port 8000)
 vllm serve PaddlePaddle/PaddleOCR-VL-1.5 \
@@ -75,7 +80,7 @@ vllm serve Infomaniak-AI/vllm-translategemma-4b-it \
     --quantization bitsandbytes \
     --load-format bitsandbytes \
     --max-model-len 32768 \
-    --max-num-seqs 30 \
+    --max-num-seqs 15 \
     --max-num-batched-tokens 8192 \
     --gpu-memory-utilization 0.5 \
     --kv-cache-dtype fp8 \
@@ -99,6 +104,16 @@ uv run -m pp_doclayout.cli translate output/paper -f pdf
 ```
 
 Output: `output/paper/translated_paper.pdf`
+
+PDF export uses Playwright-managed Chromium by default. To use a
+system-installed browser instead, set a Playwright browser channel in `.env`:
+
+```env
+PPDOCLAYOUT_PLAYWRIGHT_BROWSER_CHANNEL=chrome
+```
+
+The PDF print stylesheet maps each parsed HTML page to one PDF page and removes
+screen-only margins and shadows during export.
 
 ---
 

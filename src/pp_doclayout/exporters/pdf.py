@@ -1,6 +1,6 @@
 """PDF exporter using Playwright to render HTML."""
-import logging
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -11,6 +11,7 @@ from playwright.sync_api import (
 
 from .base import BaseExporter
 from .html import HTMLExporter
+from pp_doclayout.config import settings
 
 if TYPE_CHECKING:
     from pp_doclayout.types import ProjectData
@@ -29,7 +30,13 @@ class PDFExporter(BaseExporter):
         try:
             # Dùng Playwright xuất PDF
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
+                launch_options = {"headless": True}
+
+                if settings.playwright_browser_channel:
+                    launch_options["channel"] = (
+                        settings.playwright_browser_channel
+                    )
+                browser = p.chromium.launch(**launch_options)
                 try:
                     page = browser.new_page()
                     page.goto(tmp_html.resolve().as_uri(), wait_until="networkidle")

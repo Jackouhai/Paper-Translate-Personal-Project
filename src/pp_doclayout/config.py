@@ -117,5 +117,13 @@ class Settings(BaseSettings):
         """
         return [f.strip() for f in self.export_formats_raw.split(",")]
 
+    playwright_browser_channel: str | None = Field(
+        default=None,
+        description=(
+            "Playwright browser channel, for example 'chrome'. "
+            "Leave unset to use Playwright-managed Chromium."
+        ),
+    )
+
 
 settings = Settings()

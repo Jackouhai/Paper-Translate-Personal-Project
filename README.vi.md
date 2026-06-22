@@ -50,11 +50,16 @@ uv pip install -e .
 # 2. Kiểm tra PaddlePaddle
 uv run python scripts/check_paddle_env.py
 
-# 3. Cài Playwright (để xuất PDF)
+# 3. Cài browser cho Playwright để xuất PDF
 uv run playwright install chromium
-# Nếu Playwright không cài được Chromium, cài Google Chrome thủ công:
+
+# Nếu không dùng được Chromium do Playwright quản lý, cài Google Chrome:
 # wget -q -O /tmp/google-chrome.deb "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
-# sudo dpkg -i /tmp/google-chrome.deb && sudo apt-get install -f -y
+# sudo apt install /tmp/google-chrome.deb
+#
+# Sau đó cấu hình PP-DocLayout sử dụng Chrome trên hệ thống:
+# cp .env.example .env
+# echo "PPDOCLAYOUT_PLAYWRIGHT_BROWSER_CHANNEL=chrome" >> .env
 
 # 4. Khởi động PaddleOCR-VL (Terminal 1, port 8000)
 vllm serve PaddlePaddle/PaddleOCR-VL-1.5 \
@@ -75,7 +80,7 @@ vllm serve Infomaniak-AI/vllm-translategemma-4b-it \
     --quantization bitsandbytes \
     --load-format bitsandbytes \
     --max-model-len 32768 \
-    --max-num-seqs 30 \
+    --max-num-seqs 15 \
     --max-num-batched-tokens 8192 \
     --gpu-memory-utilization 0.5 \
     --kv-cache-dtype fp8 \
@@ -99,6 +104,16 @@ uv run -m pp_doclayout.cli translate output/paper -f pdf
 ```
 
 Output: `output/paper/translated_paper.pdf`
+
+Mặc định, PDF export dùng Chromium do Playwright quản lý. Để dùng browser đã
+cài trên hệ thống, đặt browser channel trong `.env`:
+
+```env
+PPDOCLAYOUT_PLAYWRIGHT_BROWSER_CHANNEL=chrome
+```
+
+CSS dành cho chế độ in ánh xạ mỗi trang HTML đã parse thành một trang PDF,
+đồng thời loại bỏ margin và shadow chỉ phục vụ giao diện xem trên màn hình.
 
 ---
 
