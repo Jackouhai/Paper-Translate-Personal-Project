@@ -61,6 +61,10 @@ def test_pdf_exporter_uses_playwright_chromium_and_encoded_file_url(
     monkeypatch,
 ):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "pp_doclayout.exporters.pdf.settings.playwright_browser_channel",
+        None,
+    )
 
     output_path = Path("folder with spaces/result #1.pdf")
 
@@ -98,6 +102,43 @@ def test_pdf_exporter_uses_playwright_chromium_and_encoded_file_url(
         page.goto.assert_called_once_with(
             expected_html.resolve().as_uri(),
             wait_until="networkidle",
+        )
+
+
+def test_pdf_exporter_uses_configured_browser_channel(
+    tmp_path,
+    monkeypatch,
+):
+    output_path = tmp_path / "result.pdf"
+
+    project_data = {
+        "project_name": "test",
+        "pages": [{
+            "page_index": 0,
+            "width": 800,
+            "height": 1200,
+            "html_content": "<p>Test</p>",
+        }],
+    }
+
+    monkeypatch.setattr(
+        "pp_doclayout.exporters.pdf.settings.playwright_browser_channel",
+        "chrome",
+    )
+
+    with patch(
+        "pp_doclayout.exporters.pdf.sync_playwright"
+    ) as mock_sync_playwright:
+        playwright = MagicMock()
+        mock_sync_playwright.return_value.__enter__.return_value = (
+            playwright
+        )
+
+        PDFExporter().export(project_data, output_path)
+
+        playwright.chromium.launch.assert_called_once_with(
+            headless=True,
+            channel="chrome",
         )
 
 
@@ -225,3 +266,30 @@ def test_html_exporter_uses_bounded_font_size_search(tmp_path):
     assert "const middleStep = Math.floor" in content
     assert "startSize -= 1" not in content
     assert "startSize -= 0.5" not in content
+
+
+def test_html_exporter_includes_pdf_pagination_css(tmp_path):
+    project_data = {
+        "project_name": "test",
+        "pages": [{
+            "page_index": 0,
+            "html_content": "<p>Test</p>",
+        }],
+    }
+
+    output_path = tmp_path / "result.html"
+    HTMLExporter().export(project_data, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+    style_start = content.index("<style>")
+    style_end = content.index("</style>", style_start)
+    styles = content[style_start:style_end]
+
+    assert "@page" in styles
+    assert "@media print" in styles
+    assert "break-after: page;" in styles
+    assert "page-break-after: always;" in styles
+    assert ".page {" in styles
+    assert "box-shadow: none;" in styles
+    assert content.index("@media print") > style_start
+    assert content.index("@media print") < style_end
