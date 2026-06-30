@@ -4,11 +4,10 @@
 
 | ID | File | Layout | Features | Notes |
 |----|------|--------|----------|-------|
-| sample_01 | input/2512.24092v1.pdf | unknown | unknown | Existing sample |
-| sample_02 | input/2601.09012v3.pdf | unknown | unknown | Existing sample |
-| sample_03 | input/2602.15763v1.pdf | unknown | unknown | Existing sample |
-| sample_04 | input/Group_Sequence_Policy_Optimization.pdf | unknown | unknown | Existing sample |
-| sample_05 | input/Nest_learning.pdf | unknown | unknown | Existing sample |
+| sample_01 | `input/2210.17323v2.pdf` | pending manual review | 16 pages; text, abstract, headings, footnotes | Parsed: 16/16 pages |
+| sample_02 | `input/2306.00978v6.pdf` | pending manual review | 15 pages; text, figures, captions, footnotes | Parsed: 15/15 pages |
+| sample_03 | `input/2602.15763v2.pdf` | pending manual review | 40 pages; text, chart, formulas, captions | Parsed: 40/40 pages; PDF export verified after page-break fix |
+| sample_04 | `input/2606.13392v2.pdf` | pending manual review | 30 pages; text, images, captions | Parsed: 30/30 pages |
 
 ## Feature Labels
 
@@ -21,7 +20,21 @@
 - references
 - dense_text
 
-## Week 1 Notes
+## Week 2 Status
 
-- This file only records candidate PDFs.
-- Layout/features will be filled after manually inspecting parsed output in week 2.
+- All four current input PDFs have complete per-page parse JSON.
+- Feature summaries above come from detected block labels, not final manual scoring.
+- Column layout, clipping, OCR quality, translation quality, and formula preservation still require manual review.
+- Record failures per sample instead of treating one successful end-to-end run as coverage for the whole dataset.
+
+## Manual Review Checklist
+
+For every sample, record:
+
+- one-column, two-column, or mixed layout;
+- OCR omissions and incorrect block labels;
+- translated text clipping or unreadably small font;
+- table, image, chart, and formula preservation;
+- HTML page count and PDF page count;
+- server/model configuration used for the run;
+- reproducible error messages and affected page numbers.

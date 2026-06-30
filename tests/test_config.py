@@ -12,6 +12,7 @@ def test_default_settings():
     assert settings.vllm_base_url == "http://127.0.0.1:8001/v1"
     assert settings.vllm_max_tokens == 16384
     assert settings.paddle_ocr_server_url == "http://127.0.0.1:8000/v1"
+    assert settings.paddle_ocr_client_device == "auto"
     assert settings.output_dir == "output"
     assert settings.export_formats == ["html", "pdf"]
     assert settings.playwright_browser_channel is None
@@ -47,3 +48,12 @@ def test_playwright_browser_channel_env(monkeypatch):
     settings = Settings(_env_file=None)
 
     assert settings.playwright_browser_channel == "chrome"
+
+
+def test_paddle_ocr_client_device_env(monkeypatch):
+    """Test selecting a PaddleOCR helper model device through env."""
+    monkeypatch.setenv("PPDOCLAYOUT_PADDLE_OCR_CLIENT_DEVICE", "gpu:0")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.paddle_ocr_client_device == "gpu:0"

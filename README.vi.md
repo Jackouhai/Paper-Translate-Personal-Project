@@ -53,41 +53,27 @@ uv run python scripts/check_paddle_env.py
 # 3. Cài browser cho Playwright để xuất PDF
 uv run playwright install chromium
 
+# 4. Copy file cấu hình mẫu
+cp .env.example .env
+
 # Nếu không dùng được Chromium do Playwright quản lý, cài Google Chrome:
 # wget -q -O /tmp/google-chrome.deb "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
 # sudo apt install /tmp/google-chrome.deb
 #
 # Sau đó cấu hình PP-DocLayout sử dụng Chrome trên hệ thống:
-# cp .env.example .env
 # echo "PPDOCLAYOUT_PLAYWRIGHT_BROWSER_CHANNEL=chrome" >> .env
 
-# 4. Khởi động PaddleOCR-VL (Terminal 1, port 8000)
-vllm serve PaddlePaddle/PaddleOCR-VL-1.5 \
-    --served-model-name PaddleOCR-VL-1.5-0.9B \
-    --trust-remote-code \
-    --dtype bfloat16 \
-    --max-model-len 16384 \
-    --max-num-seqs 30 \
-    --max-num-batched-tokens 8192 \
-    --gpu-memory-utilization 0.2 \
-    --enforce-eager \
-    --no-enable-prefix-caching \
-    --mm-processor-cache-gb 0
+# 5. Khởi động PaddleOCR-VL server (Terminal 1, port 8000)
+scripts/start_paddle_ocr_vl.sh
 
-# 5. Khởi động TranslateGemma (Terminal 2, port 8001)
-vllm serve Infomaniak-AI/vllm-translategemma-4b-it \
-    --dtype bfloat16 \
-    --quantization bitsandbytes \
-    --load-format bitsandbytes \
-    --max-model-len 32768 \
-    --max-num-seqs 15 \
-    --max-num-batched-tokens 8192 \
-    --gpu-memory-utilization 0.5 \
-    --kv-cache-dtype fp8 \
-    --enforce-eager \
-    --port 8001
+# 6. Khởi động TranslateGemma server (Terminal 2, port 8001)
+scripts/start_translate_gemma.sh
 
-# 6. Chạy
+# 7. Kiểm tra cả hai server (Terminal 3)
+curl http://127.0.0.1:8000/v1/models
+curl http://127.0.0.1:8001/v1/models
+
+# 8. Chạy
 uv run -m pp_doclayout.cli run paper.pdf
 ```
 
@@ -120,6 +106,39 @@ CSS dành cho chế độ in ánh xạ mỗi trang HTML đã parse thành một 
 ## Hướng dẫn sử dụng
 
 > Khuyến nghị chạy từng bước (`parse` rồi `translate`). Máy ít VRAM có thể tắt PaddleOCR-VL server sau khi parse xong để giải phóng VRAM cho TranslateGemma.
+
+### Khởi động model servers
+
+Mở hai terminal:
+
+```bash
+# Terminal 1: OCR/layout server
+scripts/start_paddle_ocr_vl.sh
+
+# Terminal 2: translation server
+scripts/start_translate_gemma.sh
+```
+
+Sau đó kiểm tra cả hai endpoint model tương thích OpenAI:
+
+```bash
+curl http://127.0.0.1:8000/v1/models
+curl http://127.0.0.1:8001/v1/models
+```
+
+CLI sẽ kiểm tra các endpoint này trước khi chạy `parse`, `translate`, hoặc
+`run`. Nếu thiếu server bắt buộc, command sẽ dừng sớm và in ra URL server cùng
+lý do lỗi.
+
+Mặc định, các model phụ local của PaddleOCR như `PP-DocLayoutV3` dùng:
+
+```env
+PPDOCLAYOUT_PADDLE_OCR_CLIENT_DEVICE=auto
+```
+
+`auto` sẽ chọn `gpu:0` nếu Paddle phát hiện CUDA GPU dùng được, nếu không sẽ
+dùng `cpu`. Có thể ép device bằng cách đặt giá trị này thành `cpu` hoặc `gpu:0`
+trong `.env`.
 
 ### Bước 1: Parse PDF
 
@@ -223,7 +242,9 @@ src/pp_doclayout/
 │   └── dynamic_font_size.html
 └── utils/
     ├── file_utils.py
-    └── path_utils.py
+    ├── paddle_device.py        # Chọn device cho model phụ PaddleOCR
+    ├── path_utils.py
+    └── server_health.py        # Kiểm tra model servers tương thích OpenAI
 ```
 
 ## Troubleshooting

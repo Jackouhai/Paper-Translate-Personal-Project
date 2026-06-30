@@ -59,6 +59,13 @@ class Settings(BaseSettings):
         default="vllm-server",
         description="Backend for PaddleOCR-VL (vllm-server or local)"
     )
+    paddle_ocr_client_device: str = Field(
+        default="auto",
+        description=(
+            "Device for local PaddleOCR document layout analysis models. "
+            "Use 'auto', 'cpu', or 'gpu:0'."
+        )
+    )
     paddle_ocr_format_block_content: bool = Field(
         default=True,
         description="Format block content (LaTeX, math, table)"

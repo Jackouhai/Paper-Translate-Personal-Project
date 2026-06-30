@@ -4,6 +4,8 @@ from typing import Optional
 
 from pp_doclayout.translators import get_gemma
 from pp_doclayout.config import settings
+from pp_doclayout.utils.paddle_device import resolve_paddle_device
+from pp_doclayout.utils.server_health import check_server_health
 
 app = typer.Typer(
     name="ppdoc",
@@ -11,6 +13,37 @@ app = typer.Typer(
     add_completion=False,
 )
 
+
+def _create_paddle_ocr_pipeline():
+    """Create the PaddleOCR-VL pipeline with explicit device selection."""
+
+    from paddleocr import PaddleOCRVL
+
+    paddle_device = resolve_paddle_device(settings.paddle_ocr_client_device)
+    typer.echo(f"PaddleOCR document layout analysis model on device: {paddle_device}")
+
+    return PaddleOCRVL(
+        vl_rec_backend=settings.paddle_ocr_backend,
+        vl_rec_server_url=settings.paddle_ocr_server_url,
+        format_block_content=settings.paddle_ocr_format_block_content,
+        use_doc_unwarping=settings.paddle_ocr_use_doc_unwarping,
+        use_chart_recognition=settings.paddle_ocr_use_chart_recognition,
+        merge_layout_blocks=settings.paddle_ocr_merge_layout_blocks,
+        use_ocr_for_image_block=settings.paddle_use_ocr_for_image_block,
+        layout_detection_model_name=settings.paddle_ocr_layout_detection_model_name,
+        use_layout_detection=settings.paddle_ocr_use_layout_detection,
+        device=paddle_device,
+    )
+
+
+def _require_server(name: str, base_url: str) -> None:
+    """Exit early when a required OpenAI-compatible server is unavailable."""
+    health = check_server_health(name=name, base_url=base_url)
+    if health.available:
+        return
+    typer.echo(f"{name} server is not ready: {health.url}", err=True)
+    typer.echo(f"  Reason: {health.message}", err=True)
+    raise typer.Exit(code=1)
 
 @app.command()
 def parse(
@@ -29,7 +62,6 @@ def parse(
     - OCR cho text
     - Lưu kết quả vào JSON và markdown
     """
-    from paddleocr import PaddleOCRVL
 
     pdf_file = Path(pdf_path)
     if not pdf_file.exists():
@@ -43,18 +75,9 @@ def parse(
     typer.echo(f"Parsing PDF: {pdf_path}")
     typer.echo(f"Output folder: {project_dir}")
 
-    # Initialize PaddleOCR-VL
-    pipeline = PaddleOCRVL(
-        vl_rec_backend=settings.paddle_ocr_backend,
-        vl_rec_server_url=settings.paddle_ocr_server_url,
-        format_block_content=settings.paddle_ocr_format_block_content,
-        use_doc_unwarping=settings.paddle_ocr_use_doc_unwarping,
-        use_chart_recognition=settings.paddle_ocr_use_chart_recognition,
-        merge_layout_blocks=settings.paddle_ocr_merge_layout_blocks,
-        use_ocr_for_image_block=settings.paddle_use_ocr_for_image_block,
-        layout_detection_model_name=settings.paddle_ocr_layout_detection_model_name,
-        use_layout_detection=settings.paddle_ocr_use_layout_detection,
-    )
+    # Check the OCR server before creating PaddleOCR-VL.
+    _require_server("PaddleOCR-VL", settings.paddle_ocr_server_url)
+    pipeline = _create_paddle_ocr_pipeline()
 
     # Process output
     output = pipeline.predict(str(pdf_path))
@@ -93,7 +116,10 @@ def translate(
     """
     from pp_doclayout.core.renderer import build_project_data, translate_page_data, render_page_blocks
 
+    # Check the translation server before creating the translator.
+    _require_server("TranslateGemma", settings.vllm_base_url)
     translator = get_gemma()
+
     # 1. Build project data from JSON files
     project_dir = Path(project_dir)
     project_data = build_project_data(project_dir)
@@ -151,11 +177,13 @@ def run(
     """
     # Step 1: Parsing
     typer.echo("=== Step 1: Parse PDF ===")
-    from paddleocr import PaddleOCRVL
 
     pdf_file = Path(pdf_path)
     if not pdf_file.exists():
         raise typer.Exit(f"File không tồn tại: {pdf_path}", code=1)
+
+    _require_server("PaddleOCR-VL", settings.paddle_ocr_server_url)
+    _require_server("TranslateGemma", settings.vllm_base_url)
 
     project_dir = Path(settings.output_dir) / pdf_file.stem
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -163,17 +191,7 @@ def run(
     typer.echo(f"Parsing PDF: {pdf_path}")
     typer.echo(f"Output folder: {project_dir}")
 
-    pipeline = PaddleOCRVL(
-        vl_rec_backend=settings.paddle_ocr_backend,
-        vl_rec_server_url=settings.paddle_ocr_server_url,
-        format_block_content=settings.paddle_ocr_format_block_content,
-        use_doc_unwarping=settings.paddle_ocr_use_doc_unwarping,
-        use_chart_recognition=settings.paddle_ocr_use_chart_recognition,
-        merge_layout_blocks=settings.paddle_ocr_merge_layout_blocks,
-        use_ocr_for_image_block=settings.paddle_use_ocr_for_image_block,
-        layout_detection_model_name=settings.paddle_ocr_layout_detection_model_name,
-        use_layout_detection=settings.paddle_ocr_use_layout_detection,
-    )
+    pipeline = _create_paddle_ocr_pipeline()
 
     output = pipeline.predict(str(pdf_path))
     for i, res in enumerate(output):
