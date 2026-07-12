@@ -19,3 +19,14 @@ PLAN.md
 # Other untracked
 pdf/
 
+# Frontend
+node_modules/
+papertranslate-ui/node_modules/
+papertranslate-ui/dist/
+
+# Local environment
+.env.local
+
+# Local development
+.vscode/
+vllm.log
