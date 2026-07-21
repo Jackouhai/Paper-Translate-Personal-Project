@@ -575,11 +575,13 @@ function ResultArea({ fileName, totalElapsed, exportFormat, onDownload, resultUr
             )
           ) : (
             resultUrls?.html ? (
-              <iframe
-                src={resultUrls.html}
-                title="Translated HTML Preview"
-                className="w-full h-[700px] rounded-lg border border-slate-200 bg-white"
-              />
+              <div className="w-full min-w-0 max-w-full overflow-hidden">
+                <iframe
+                  src={resultUrls.html}
+                  title="Translated HTML Preview"
+                  className="block h-[75vh] w-full max-w-full rounded-lg border border-slate-200 bg-white"
+                />
+              </div>
             ) : (
               <div className="bg-slate-100 rounded-lg h-96 flex items-center justify-center">
                 <p className="text-sm text-slate-400">Translated preview</p>
