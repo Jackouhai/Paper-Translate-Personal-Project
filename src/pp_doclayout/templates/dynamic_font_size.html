@@ -1,56 +1,55 @@
 <script>
-    function fitText(el){
+function textFits(el) {
+    return (
+        el.scrollHeight <= el.clientHeight &&
+        el.scrollWidth <= el.clientWidth
+    );
+}
+
+function fitText(el) {
     const cls = el.className || "";
 
-    let startSize = 16;
     let minSize = 9;
     let maxSize = 20;
 
     if (cls.includes("doc_title") || cls.includes("paragraph_title")) {
-        startSize = 24;
         minSize = 14;
         maxSize = 40;
-    } 
-    else if (cls.includes("figure_title") || cls.includes("table_caption")) {
-        startSize = 16;
+    } else if (
+        cls.includes("figure_title") ||
+        cls.includes("table_caption")
+    ) {
         minSize = 10;
         maxSize = 24;
-    } 
-    else if (cls.includes("abstract")) {
-        startSize = 16;
+    } else if (cls.includes("abstract")) {
         minSize = 9;
         maxSize = 30;
     }
 
-    el.style.fontSize = startSize + "px";
+    // Search integer steps so each step represents 0.5px.
+    let lowStep = Math.ceil(minSize * 2);
+    let highStep = Math.floor(maxSize * 2);
+    let bestStep = lowStep;
 
-    while (
-        (el.scrollHeight > el.clientHeight ||
-        el.scrollWidth > el.clientWidth) &&
-        startSize > minSize
-    ){
-        startSize -= 0.5;
-        el.style.fontSize = startSize + "px";
-    }
+    while (lowStep <= highStep) {
+        const middleStep = Math.floor((lowStep + highStep) / 2);
+        const fontSize = middleStep / 2;
 
-    while (
-        el.scrollHeight <= el.clientHeight &&
-        el.scrollWidth <= el.clientWidth &&
-        startSize < maxSize
-    ){
-        const next = startSize + 0.5;
-        el.style.fontSize = next + "px";
+        el.style.fontSize = fontSize + "px";
 
-        if (el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth){
-            el.style.fontSize = startSize + "px";
-            break;
+        if (textFits(el)) {
+            bestStep = middleStep;
+            lowStep = middleStep + 1;
+        } else {
+            highStep = middleStep - 1;
         }
-        startSize = next;
     }
+
+    el.style.fontSize = bestStep / 2 + "px";
 }
 
-function fitAllText(){
-    document.querySelectorAll('.auto-fit').forEach(fitText);
+function fitAllText() {
+    document.querySelectorAll(".auto-fit").forEach(fitText);
 }
 
 document.addEventListener("DOMContentLoaded", fitAllText);
@@ -58,7 +57,7 @@ document.addEventListener("DOMContentLoaded", fitAllText);
 window.addEventListener("load", () => {
     fitAllText();
 
-    if (window.MathJax?.typesetPromise){
+    if (window.MathJax?.typesetPromise) {
         MathJax.typesetPromise().then(fitAllText);
     }
 });

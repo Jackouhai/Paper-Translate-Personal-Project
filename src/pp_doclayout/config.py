@@ -33,6 +33,18 @@ class Settings(BaseSettings):
         default=16384,
         description="Maximum tokens for generation"
     )
+    vllm_min_output_tokens: int = Field(
+        default=512,
+        description="Minimum max_tokens for a translation request"
+    )
+    vllm_output_token_multiplier: float = Field(
+        default=2.5,
+        description="Estimated output token multiplier based on input length"
+    )
+    vllm_retry_attempts: int = Field(
+        default=2,
+        description="Number of retry attempts for failed translation requests"
+    )
     vllm_model_name: str = Field(
         default="Infomaniak-AI/vllm-translategemma-4b-it",
         description="Model name for vLLM"
@@ -46,6 +58,13 @@ class Settings(BaseSettings):
     paddle_ocr_backend: str = Field(
         default="vllm-server",
         description="Backend for PaddleOCR-VL (vllm-server or local)"
+    )
+    paddle_ocr_client_device: str = Field(
+        default="auto",
+        description=(
+            "Device for local PaddleOCR document layout analysis models. "
+            "Use 'auto', 'cpu', or 'gpu:0'."
+        )
     )
     paddle_ocr_format_block_content: bool = Field(
         default=True,
@@ -76,20 +95,6 @@ class Settings(BaseSettings):
         description="OCR for images"
     )
 
-    # ===== Batch Processing Settings =====
-    batch_size_small: int = Field(
-        default=16,
-        description="Batch size for small texts (<100 tokens)"
-    )
-    batch_size_medium: int = Field(
-        default=8,
-        description="Batch size for medium texts (100-500 tokens)"
-    )
-    batch_size_large: int = Field(
-        default=4,
-        description="Batch size for large texts (>500 tokens)"
-    )
-
     # ===== Concurrent Request Settings =====
     max_concurrent_requests: int = Field(
         default=32,
@@ -118,6 +123,14 @@ class Settings(BaseSettings):
             List of export formats
         """
         return [f.strip() for f in self.export_formats_raw.split(",")]
+
+    playwright_browser_channel: str | None = Field(
+        default=None,
+        description=(
+            "Playwright browser channel, for example 'chrome'. "
+            "Leave unset to use Playwright-managed Chromium."
+        ),
+    )
 
 
 settings = Settings()

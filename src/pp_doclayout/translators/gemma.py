@@ -1,7 +1,12 @@
+import logging
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from openai import OpenAI
 
 from .base import BaseTranslator
-from concurrent.futures import ThreadPoolExecutor, as_completed
+
+logger = logging.getLogger(__name__)
 
 
 class GemmaTranslator(BaseTranslator):
@@ -18,8 +23,25 @@ class GemmaTranslator(BaseTranslator):
         self.model_name = model_name or settings.vllm_model_name
         self.max_tokens = max_tokens or settings.vllm_max_tokens
         self.max_concurrent_requests = max_concurrent_requests or settings.max_concurrent_requests
+        self.min_output_tokens = settings.vllm_min_output_tokens
+        self.output_token_multiplier = settings.vllm_output_token_multiplier
+        self.retry_attempts = settings.vllm_retry_attempts
 
         self.client = OpenAI(base_url=self.base_url, api_key="unused")
+
+    def _get_max_tokens_for_text(self, text: str) -> int:
+        """Estimate tokens length for request
+
+        Args:
+            text (str): input text
+
+        Returns:
+            int: tokens length
+        """
+        estimated_input_tokens = max(1, len(text.split()) * 2)
+        estimated_output_tokens = int(estimated_input_tokens * self.output_token_multiplier)
+        request_max_tokens = max(self.min_output_tokens, estimated_output_tokens)
+        return min(self.max_tokens, request_max_tokens)
 
     def translate(
         self, text: str, source_lang: str = "en", target_lang: str = "vi"
@@ -34,25 +56,33 @@ class GemmaTranslator(BaseTranslator):
             }
         ]
 
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=messages,
-                max_tokens=self.max_tokens,
-                temperature=0,
-            )
-            content = response.choices[0].message.content
-            return content.strip() if content else text
-        except Exception as e:
-            print(f"Gemma translation error: {e}")
-            return text
+        request_max_tokens = self._get_max_tokens_for_text(text)
+        for attempt in range(self.retry_attempts + 1):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    max_tokens=request_max_tokens,
+                    temperature=0,
+                )
+                content = response.choices[0].message.content
+                return content.strip() if content else text
+            except Exception as exc:
+                if attempt >= self.retry_attempts:
+                    logger.error(
+                        "Gemma translation failed after %d attempts: %s",
+                        self.retry_attempts + 1,
+                        exc
+                    )
+                    return text
+                time.sleep(0.5 * (attempt + 1))
 
     def translate_batch(
         self,
         texts: list[str],
         source_lang: str = "en",
         target_lang: str = "vi",
-    ) -> list[str | None]:
+    ) -> list[str]:
         """Translate multiple texts using concurrent requests.
 
         vLLM will automatically batch these requests
@@ -64,16 +94,19 @@ class GemmaTranslator(BaseTranslator):
             target_lang: Target language code
 
         Returns:
-            List of translations (None if failed for a
-            particular text)
+            List of translations. Blank inputs produce empty strings.
         """
         if not texts:
             return []
 
         # Use ThreadPoolExecutor for concurrent requests
         max_workers = min(self.max_concurrent_requests, len(texts))
-        print(f"[DEBUG] translate_batch: Processing {len(texts)} texts with max_workers={max_workers}, vLLM at {self.base_url}")
-        results = [None] * len(texts)
+        logger.info(
+            "Translating %d blocks with %d concurrent requests",
+            len(texts),
+            max_workers,
+        )
+        results = [""] * len(texts)
 
         def translate_one(idx: int, text: str) -> tuple[int, str]:
             """Translate a single text."""
@@ -82,7 +115,9 @@ class GemmaTranslator(BaseTranslator):
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
-                executor.submit(translate_one, i, text): i for i, text in enumerate(texts) if text and text.strip()
+                executor.submit(translate_one, i, text): i
+                for i, text in enumerate(texts)
+                if text and text.strip()
             }
 
             for future in as_completed(futures):

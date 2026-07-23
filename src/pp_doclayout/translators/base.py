@@ -24,7 +24,7 @@ class BaseTranslator(ABC):
         texts: list[str],
         source_lang: str = "en",
         target_lang: str = "vi",
-    ) -> list[str | None]:
+    ) -> list[str]:
         """
         Translate multiple texts in batch.
 
@@ -32,7 +32,7 @@ class BaseTranslator(ABC):
         Override in subclasses for true batch processing.
 
         Returns:
-            List of translations (None if failed for a particular text)
+            List of translations. Blank inputs produce empty strings.
         """
         return [self.translate(text, source_lang, target_lang) for text in texts]
 

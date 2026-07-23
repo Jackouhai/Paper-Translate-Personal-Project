@@ -25,7 +25,7 @@ body{
   position:absolute;
   box-sizing:border-box;
   overflow:hidden;
-  white-space:pre-wrap;
+  white-space: pre-wrap;
   line-height:1.2;
   text-align: justify
 }
@@ -40,10 +40,12 @@ h1, h2 {
   font-size:26px;
   font-weight:bold;
   text-align:center;
+  text-wrap:balance;
 }
 
 .block.paragraph_title{
   font-weight:bold;
+  text-wrap:balance;
 }
 
 /* ===== CAPTION ===== */
@@ -112,5 +114,34 @@ h1, h2 {
 
 mjx-container[jax="CHTML"][display="true"] {
   margin: 0 !important;
+}
+
+@page {
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+
+  .paper-page,
+  .page-container {
+    margin: 0;
+    padding: 0;
+  }
+
+  .paper-page:not(:last-child) {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .page {
+    margin: 0;
+    box-shadow: none;
+  }
 }
 </style>
