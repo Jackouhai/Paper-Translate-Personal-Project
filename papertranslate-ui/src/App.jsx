@@ -19,6 +19,9 @@ import {
   Eye,
 } from "lucide-react";
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8002";
+
 /* -------------------------------------------------------------------------- */
 /* Constants & mock data                                                       */
 /* -------------------------------------------------------------------------- */
@@ -118,6 +121,18 @@ const MOCK_HISTORY = [
     output: "HTML, PDF, Markdown",
   },
 ];
+
+function downloadFile(url, filename) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 
 /* -------------------------------------------------------------------------- */
 /* Helper components                                                          */
@@ -559,9 +574,9 @@ function ResultArea({ fileName, totalElapsed, exportFormat, onDownload, resultUr
 
         <div className="p-5">
           {activeTab === "original" ? (
-            resultUrls?.pdf ? (
+            resultUrls?.originalPdf ? (
               <iframe
-                src={resultUrls.pdf}
+                src={resultUrls.originalPdf}
                 title="Original PDF Preview"
                 className="w-full h-[700px] rounded-lg border border-slate-200 bg-white"
               />
@@ -669,144 +684,224 @@ function TranslatePage() {
   const [showResults, setShowResults] = useState(false);
   const [toast, setToast] = useState(null);
   const [resultUrls, setResultUrls] = useState({
-    pdf: null,
+    originalPdf: null,
+    translatedPdf: null,
     html: null,
+    markdown: null,
+    json: null,
   });
-  const timerRef = useRef(null);
+
+  const [projectName, setProjectName] = useState(null);
+  const [pipelineStage, setPipelineStage] = useState("idle");
+  // idle | parsing | parsed | translating | completed | failed
 
   const handleFileSelect = (f) => {
     setFile(f);
     setStatus("idle");
+    setPipelineStage("idle");
+    setProjectName(null);
     setShowResults(false);
+    setTotalElapsed(0);
+    setCurrentStepIndex(0);
+    setResultUrls({
+      pdf: null,
+      html: null,
+    });
     setProgressValues(PROGRESS_STEPS.map(() => 0));
   };
 
   const handleClearFile = () => {
     setFile(null);
     setStatus("idle");
+    setPipelineStage("idle");
+    setProjectName(null);
     setShowResults(false);
+    setTotalElapsed(0);
+    setCurrentStepIndex(0);
+    setResultUrls({
+      pdf: null,
+      html: null,
+    });
+    setProgressValues(PROGRESS_STEPS.map(() => 0));
   };
 
-  const startTranslation = async () => {
-  if (!file) {
-    setToast("Please select a PDF file");
-    return;
-  }
-
-  setStatus("processing");
-  setShowResults(false);
-  setCurrentStepIndex(0);
-  setProgressValues(PROGRESS_STEPS.map(() => 0));
-
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const response = await fetch("http://127.0.0.1:8002/translate", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error("Upload failed");
+  const startParsing = async () => {
+    if (!file) {
+      setToast("Please select a PDF file");
+      return;
     }
 
-    const data = await response.json();
-    setResultUrls({
-      pdf: data.pdf_url,
-      html: data.html_url,
-    });
-
-    console.log("Backend response:", data);
-
-    setToast(`Uploaded: ${data.filename}`);
-
-    // fake progress demo
-    for (let i = 0; i < PROGRESS_STEPS.length; i++) {
-      setCurrentStepIndex(i);
-
-      setProgressValues((prev) => {
-        const next = [...prev];
-        next[i] = 100;
-        return next;
-      });
-
-      await new Promise((resolve) =>
-        setTimeout(resolve, PROGRESS_STEPS[i].fakeDuration)
-      );
-    }
-
-    setStatus("complete");
-    setShowResults(true);
-
-  } catch (error) {
-    console.error(error);
+    const startedAt = performance.now();
 
     setStatus("idle");
+    setPipelineStage("parsing");
+    setProjectName(null);
+    setShowResults(false);
+    setCurrentStepIndex(0);
+    setProgressValues(PROGRESS_STEPS.map(() => 0));
 
-    setToast("Backend connection failed");
-  }
-};
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
 
-  // Drive the fake progress simulation
-  useEffect(() => {
-    if (status !== "processing") return;
+      const response = await fetch(`${API_BASE_URL}/pipeline/parse`, {
+        method: "POST",
+        body: formData,
+      });
 
-    const tickMs = 60;
-    let stepIdx = 0;
-    let elapsedInStep = 0;
-    let totalElapsedMs = 0;
+      const data = await response.json();
 
-    timerRef.current = setInterval(() => {
-      const step = PROGRESS_STEPS[stepIdx];
-      elapsedInStep += tickMs;
-      totalElapsedMs += tickMs;
+      if (!response.ok) {
+        throw new Error(data.detail || "PDF parsing failed");
+      }
 
-      const pct = Math.min(100, (elapsedInStep / step.fakeDuration) * 100);
+      setProjectName(data.project_name);
+      setResultUrls({
+        originalPdf: data.pdf_url,
+        translatedPdf: null,
+        html: null,
+        markdown: null,
+        json: null,
+      });
 
-      setProgressValues((prev) => {
-        const next = [...prev];
-        next[stepIdx] = pct;
+      setProgressValues((previous) => {
+        const next = [...previous];
+        next[0] = 100;
+        next[1] = 100;
         return next;
       });
-      setTotalElapsed(totalElapsedMs);
 
-      if (pct >= 100) {
-        if (stepIdx < PROGRESS_STEPS.length - 1) {
-          stepIdx += 1;
-          elapsedInStep = 0;
-          setCurrentStepIndex(stepIdx);
-        } else {
-          clearInterval(timerRef.current);
-          setStatus("complete");
+      setCurrentStepIndex(2);
+      setPipelineStage("parsed");
+      setShowResults(true);
+      setTotalElapsed(performance.now() - startedAt);
+      setToast("OCR and layout parsing completed");
+
+      console.log("Parse response:", data);
+    } catch (error) {
+      console.error(error);
+
+      setStatus("idle");
+      setPipelineStage("failed");
+      setToast(
+        error instanceof Error ? error.message : "Backend parse failed"
+      );
+    }
+  };
+
+  const continueTranslation = async () => {
+    if (!projectName) {
+      setToast("Please parse the PDF first");
+      return;
+    }
+
+    const startedAt = performance.now();
+
+    setStatus("processing");
+    setPipelineStage("translating");
+    setShowResults(false);
+    setCurrentStepIndex(2);
+    setProgressValues([100, 100, 15, 0, 0]);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/pipeline/translate/${encodeURIComponent(projectName)}`,
+        {
+          method: "POST",
         }
-      }
-    }, tickMs);
+      );
 
-    return () => clearInterval(timerRef.current);
-  }, [status]);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Translation failed");
+      }
+
+      setResultUrls((current) => ({
+        ...current,
+        html: data.html_url,
+        markdown: data.markdown_url,
+        json: data.json_url,
+        translatedPdf: data.pdf_url,
+      }));
+
+      setProgressValues(PROGRESS_STEPS.map(() => 100));
+      setCurrentStepIndex(PROGRESS_STEPS.length - 1);
+      setTotalElapsed((previous) => previous + performance.now() - startedAt);
+      setPipelineStage("completed");
+      setStatus("complete");
+      setShowResults(true);
+      setToast("Translation completed");
+
+      console.log("Translation response:", data);
+    } catch (error) {
+      console.error(error);
+
+      setStatus("idle");
+      setPipelineStage("failed");
+      setShowResults(true);
+      setToast(
+        error instanceof Error ? error.message : "Backend translation failed"
+      );
+    }
+  };
 
   const handleDownload = (label) => {
-    if (label.includes("HTML") && resultUrls.html) {
-      window.open(resultUrls.html, "_blank");
-      return;
-    }
+    const outputName = projectName || file?.name?.replace(/\.pdf$/i, "") || "translated_document";
 
-    if (label.includes("PDF") && resultUrls.pdf) {
-      window.open(resultUrls.pdf, "_blank");
-      return;
-    }
+      if (label.includes("HTML")) {
+        if (!resultUrls.html) {
+          setToast("Translated HTML is not available yet");
+          return;
+        }
 
-    setToast(`${label} is not available yet`);
+        downloadFile(
+          resultUrls.html,
+          `${outputName}.html`,
+        );
+        return;
+      }
+
+      if (label.includes("Markdown")) {
+        if (!resultUrls.markdown) {
+          setToast("Translated Markdown is not available yet");
+          return;
+        }
+
+        downloadFile(
+          resultUrls.markdown,
+          `${outputName}.md`,
+        );
+        return;
+      }
+
+      if (label.includes("PDF")) {
+        if (!resultUrls.translatedPdf) {
+          setToast("Translated PDF export is not available yet");
+          return;
+        }
+
+        downloadFile(
+          resultUrls.translatedPdf,
+          `${outputName}.pdf`,
+        );
+        return;
+      }
+
+      setToast(`${label} is not available yet`);
   };
 
   const isComplete = status === "complete";
   const isProcessing = status === "processing";
+  const isParsing = pipelineStage === "parsing";
+  const isTranslating = pipelineStage === "translating";
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-800">Translate document</h1>
+        <h1 className="text-xl font-semibold text-slate-800">
+          Translate document
+        </h1>
         <p className="text-sm text-slate-500 mt-1">
           Upload an English scientific PDF and configure how it should be
           translated into Vietnamese.
@@ -821,19 +916,54 @@ function TranslatePage() {
 
       <ConfigurationPanel config={config} setConfig={setConfig} />
 
-      <button
-        onClick={startTranslation}
-        disabled={!file || isProcessing}
-        className={`w-full py-3.5 rounded-xl text-sm font-semibold transition-colors ${
-          !file || isProcessing
-            ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-            : "bg-blue-600 hover:bg-blue-700 text-white"
-        }`}
-      >
-        {isProcessing ? "Translating..." : "Start translation"}
-      </button>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={startParsing}
+          disabled={!file || isParsing || isTranslating}
+          className={`w-full rounded-xl py-3.5 text-sm font-semibold transition-colors ${
+            !file || isParsing || isTranslating
+              ? "cursor-not-allowed bg-slate-100 text-slate-400"
+              : "bg-blue-600 text-white hover:bg-blue-700"
+          }`}
+        >
+          {isParsing ? "Parsing PDF..." : "1. Parse PDF"}
+        </button>
 
-      {(isComplete || showResults) && file && (
+        <button
+          type="button"
+          onClick={continueTranslation}
+          disabled={!projectName || isParsing || isTranslating}
+          className={`w-full rounded-xl py-3.5 text-sm font-semibold transition-colors ${
+            !projectName || isParsing || isTranslating
+              ? "cursor-not-allowed bg-slate-100 text-slate-400"
+              : "bg-emerald-600 text-white hover:bg-emerald-700"
+          }`}
+        >
+          {isTranslating
+            ? "Translating..."
+            : "2. Continue Translation"}
+        </button>
+      </div>
+
+      {pipelineStage === "parsed" && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <p className="font-semibold">OCR and layout parsing completed.</p>
+          <p className="mt-1">
+            Stop PaddleOCR-VL, start TranslateGemma on port 8001, then click
+            Continue Translation.
+          </p>
+        </div>
+      )}
+
+      {pipelineStage === "failed" && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          The current pipeline stage failed. Check the backend and model-server
+          terminals, then try the stage again.
+        </div>
+      )}
+
+      {(showResults || isComplete) && file && (
         <ResultArea
           fileName={file.name}
           totalElapsed={totalElapsed}
