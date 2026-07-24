@@ -1,5 +1,6 @@
 from pathlib import Path
 import shutil
+import requests
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -225,3 +226,31 @@ def translate_parsed_project(project_name: str):
             status_code=500,
             detail=str(exc),
         ) from exc
+
+@app.get("/pipeline/model-status")
+def get_model_status():
+    ocr_ready = False
+    translator_ready = False
+
+    try:
+        response = requests.get(
+            "http://127.0.0.1:8000/v1/models",
+            timeout=2,
+        )
+        ocr_ready = response.ok
+    except requests.RequestException:
+        pass
+
+    try:
+        response = requests.get(
+            "http://127.0.0.1:8001/v1/models",
+            timeout=2,
+        )
+        translator_ready = response.ok
+    except requests.RequestException:
+        pass
+
+    return {
+        "ocr_ready": ocr_ready,
+        "translator_ready": translator_ready,
+    }

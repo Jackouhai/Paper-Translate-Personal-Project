@@ -648,6 +648,30 @@ function Toast({ message, onClose }) {
   );
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForTranslator() {
+  while (true) {
+    const response = await fetch(
+      `${API_BASE_URL}/pipeline/model-status`,
+    );
+
+    if (!response.ok) {
+      throw new Error("Could not check model status");
+    }
+
+    const data = await response.json();
+
+    if (data.translator_ready) {
+      return;
+    }
+
+    await sleep(3000);
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Translate page                                                              */
 /* -------------------------------------------------------------------------- */
@@ -725,127 +749,88 @@ function TranslatePage() {
     setProgressValues(PROGRESS_STEPS.map(() => 0));
   };
 
-  const startParsing = async () => {
+  const startTranslation = async () => {
     if (!file) {
       setToast("Please select a PDF file");
       return;
     }
 
-    const startedAt = performance.now();
-
-    setStatus("idle");
+    setStatus("processing");
     setPipelineStage("parsing");
-    setProjectName(null);
     setShowResults(false);
-    setCurrentStepIndex(0);
-    setProgressValues(PROGRESS_STEPS.map(() => 0));
 
     try {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`${API_BASE_URL}/pipeline/parse`, {
-        method: "POST",
-        body: formData,
-      });
+      const parseResponse = await fetch(
+        `${API_BASE_URL}/pipeline/parse`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
 
-      const data = await response.json();
+      const parseData = await parseResponse.json();
 
-      if (!response.ok) {
-        throw new Error(data.detail || "PDF parsing failed");
+      if (!parseResponse.ok) {
+        throw new Error(parseData.detail || "PDF parsing failed");
       }
 
-      setProjectName(data.project_name);
+      setProjectName(parseData.project_name);
+
       setResultUrls({
-        originalPdf: data.pdf_url,
+        originalPdf: parseData.pdf_url,
         translatedPdf: null,
         html: null,
         markdown: null,
         json: null,
       });
 
-      setProgressValues((previous) => {
-        const next = [...previous];
-        next[0] = 100;
-        next[1] = 100;
-        return next;
-      });
+      setPipelineStage("waiting_for_translator");
+      setToast("Stop PaddleOCR and start TranslateGemma");
 
-      setCurrentStepIndex(2);
-      setPipelineStage("parsed");
-      setShowResults(true);
-      setTotalElapsed(performance.now() - startedAt);
-      setToast("OCR and layout parsing completed");
+      await waitForTranslator();
 
-      console.log("Parse response:", data);
-    } catch (error) {
-      console.error(error);
+      setPipelineStage("translating");
+      setToast("TranslateGemma detected. Starting translation.");
 
-      setStatus("idle");
-      setPipelineStage("failed");
-      setToast(
-        error instanceof Error ? error.message : "Backend parse failed"
-      );
-    }
-  };
-
-  const continueTranslation = async () => {
-    if (!projectName) {
-      setToast("Please parse the PDF first");
-      return;
-    }
-
-    const startedAt = performance.now();
-
-    setStatus("processing");
-    setPipelineStage("translating");
-    setShowResults(false);
-    setCurrentStepIndex(2);
-    setProgressValues([100, 100, 15, 0, 0]);
-
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/pipeline/translate/${encodeURIComponent(projectName)}`,
+      const translateResponse = await fetch(
+        `${API_BASE_URL}/pipeline/translate/${encodeURIComponent(
+          parseData.project_name,
+        )}`,
         {
           method: "POST",
-        }
+        },
       );
 
-      const data = await response.json();
+      const translateData = await translateResponse.json();
 
-      if (!response.ok) {
-        throw new Error(data.detail || "Translation failed");
+      if (!translateResponse.ok) {
+        throw new Error(
+          translateData.detail || "Translation failed",
+        );
       }
 
       setResultUrls((current) => ({
         ...current,
-        html: data.html_url,
-        markdown: data.markdown_url,
-        json: data.json_url,
-        translatedPdf: data.pdf_url,
+        html: translateData.html_url,
+        markdown: translateData.markdown_url,
+        json: translateData.json_url,
+        translatedPdf: translateData.pdf_url,
       }));
 
-      setProgressValues(PROGRESS_STEPS.map(() => 100));
-      setCurrentStepIndex(PROGRESS_STEPS.length - 1);
-      setTotalElapsed((previous) => previous + performance.now() - startedAt);
       setPipelineStage("completed");
       setStatus("complete");
       setShowResults(true);
       setToast("Translation completed");
-
-      console.log("Translation response:", data);
     } catch (error) {
       console.error(error);
-
-      setStatus("idle");
       setPipelineStage("failed");
-      setShowResults(true);
-      setToast(
-        error instanceof Error ? error.message : "Backend translation failed"
-      );
+      setStatus("idle");
+      setToast(error.message || "Pipeline failed");
     }
   };
-
   const handleDownload = (label) => {
     const outputName = projectName || file?.name?.replace(/\.pdf$/i, "") || "translated_document";
 
@@ -919,32 +904,36 @@ function TranslatePage() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <button
           type="button"
-          onClick={startParsing}
-          disabled={!file || isParsing || isTranslating}
+          onClick={startTranslation}
+          disabled={!file || status === "processing"}
           className={`w-full rounded-xl py-3.5 text-sm font-semibold transition-colors ${
-            !file || isParsing || isTranslating
+            !file || status === "processing"
               ? "cursor-not-allowed bg-slate-100 text-slate-400"
               : "bg-blue-600 text-white hover:bg-blue-700"
           }`}
         >
-          {isParsing ? "Parsing PDF..." : "1. Parse PDF"}
-        </button>
+          {pipelineStage === "parsing" && "Parsing PDF..."}
 
-        <button
-          type="button"
-          onClick={continueTranslation}
-          disabled={!projectName || isParsing || isTranslating}
-          className={`w-full rounded-xl py-3.5 text-sm font-semibold transition-colors ${
-            !projectName || isParsing || isTranslating
-              ? "cursor-not-allowed bg-slate-100 text-slate-400"
-              : "bg-emerald-600 text-white hover:bg-emerald-700"
-          }`}
-        >
-          {isTranslating
-            ? "Translating..."
-            : "2. Continue Translation"}
+          {pipelineStage === "waiting_for_translator" &&
+            "Waiting for TranslateGemma..."}
+
+          {pipelineStage === "translating" &&
+            "Translating document..."}
+
+          {![
+            "parsing",
+            "waiting_for_translator",
+            "translating",
+          ].includes(pipelineStage) && "Start Translation"}
         </button>
       </div>
+      
+      {pipelineStage === "waiting_for_translator" && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          OCR completed. Stop PaddleOCR-VL and start TranslateGemma.
+          Translation will continue automatically.
+        </div>
+      )}
 
       {pipelineStage === "parsed" && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
