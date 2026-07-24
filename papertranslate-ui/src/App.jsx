@@ -711,8 +711,8 @@ function TranslatePage() {
     originalPdf: null,
     translatedPdf: null,
     html: null,
-    markdown: null,
-    json: null,
+    markdownUrls: null,
+    jsonUrls: [],
   });
 
   const [projectName, setProjectName] = useState(null);
@@ -728,8 +728,11 @@ function TranslatePage() {
     setTotalElapsed(0);
     setCurrentStepIndex(0);
     setResultUrls({
-      pdf: null,
+      originalPdf: null,
+      translatedPdf: null,
       html: null,
+      markdownUrls: [],
+      jsonUrls: [],
     });
     setProgressValues(PROGRESS_STEPS.map(() => 0));
   };
@@ -743,8 +746,11 @@ function TranslatePage() {
     setTotalElapsed(0);
     setCurrentStepIndex(0);
     setResultUrls({
-      pdf: null,
+      originalPdf: null,
+      translatedPdf: null,
       html: null,
+      markdownUrls: [],
+      jsonUrls: [],
     });
     setProgressValues(PROGRESS_STEPS.map(() => 0));
   };
@@ -783,8 +789,8 @@ function TranslatePage() {
         originalPdf: parseData.pdf_url,
         translatedPdf: null,
         html: null,
-        markdown: null,
-        json: null,
+        markdownUrls: [],
+        jsonUrls: [],
       });
 
       setPipelineStage("waiting_for_translator");
@@ -815,8 +821,8 @@ function TranslatePage() {
       setResultUrls((current) => ({
         ...current,
         html: translateData.html_url,
-        markdown: translateData.markdown_url,
-        json: translateData.json_url,
+        markdownUrls: translateData.markdown_urls,
+        jsonUrls: translateData.json_urls || [],
         translatedPdf: translateData.pdf_url,
       }));
 
@@ -848,8 +854,10 @@ function TranslatePage() {
       }
 
       if (label.includes("Markdown")) {
-        if (!resultUrls.markdown) {
-          setToast("Translated Markdown is not available yet");
+        const firstMarkdownUrl = resultUrls.markdownUrls?.[0];
+
+        if (!firstMarkdownUrl) {
+          setToast("Markdown is not available yet");
           return;
         }
 
@@ -859,6 +867,7 @@ function TranslatePage() {
         );
         return;
       }
+
 
       if (label.includes("PDF")) {
         if (!resultUrls.translatedPdf) {
@@ -976,7 +985,7 @@ function TranslatePage() {
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
   );
-}
+  }
 
 /* -------------------------------------------------------------------------- */
 /* History page                                                                */

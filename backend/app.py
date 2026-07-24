@@ -194,30 +194,74 @@ async def parse_uploaded_pdf(
 # Stage 2: Translate project
 # =========================
 
+def merge_markdown_files(
+    project_dir: Path,
+    project_name: str,
+) -> Path | None:
+    markdown_files = sorted(
+        project_dir.glob("*.md"),
+        key=lambda path: path.name,
+    )
+
+    if not markdown_files:
+        return None
+
+    merged_path = project_dir / f"{project_name}.md"
+    merged_sections = []
+
+    for page_number, markdown_path in enumerate(
+        markdown_files,
+        start=1,
+    ):
+        content = markdown_path.read_text(
+            encoding="utf-8",
+        ).strip()
+
+        merged_sections.append(
+            f"<!-- Page {page_number} -->\n\n{content}"
+        )
+
+    merged_path.write_text(
+        "\n\n---\n\n".join(merged_sections) + "\n",
+        encoding="utf-8",
+    )
+
+    return merged_path
+
 @app.post("/pipeline/translate/{project_name}")
 def translate_parsed_project(project_name: str):
     try:
         html_path = translate_project(project_name)
         project_dir = PIPELINE_OUTPUT_DIR / project_name
 
-        markdown_files = sorted(project_dir.glob("*.md"))
-        json_files = sorted(project_dir.glob("*_res.json"))
+        json_files = sorted(
+            project_dir.glob("*_res.json"),
+        )
+
+        merged_markdown_path = merge_markdown_files(
+            project_dir,
+            project_name,
+        )
+
+        json_urls = [
+            build_pipeline_output_url(path)
+            for path in json_files
+        ]
 
         return {
             "status": "completed",
             "project_name": project_name,
+            "page_count": len(json_files),
             "html_file": html_path.name,
             "html_url": build_pipeline_output_url(html_path),
             "markdown_url": (
-                build_pipeline_output_url(markdown_files[0])
-                if markdown_files
+                build_pipeline_output_url(
+                    merged_markdown_path,
+                )
+                if merged_markdown_path
                 else None
             ),
-            "json_url": (
-                build_pipeline_output_url(json_files[0])
-                if json_files
-                else None
-            ),
+            "json_urls": json_urls,
             "pdf_url": None,
         }
 
@@ -226,6 +270,9 @@ def translate_parsed_project(project_name: str):
             status_code=500,
             detail=str(exc),
         ) from exc
+
+
+
 
 @app.get("/pipeline/model-status")
 def get_model_status():
