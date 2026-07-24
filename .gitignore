@@ -32,3 +32,27 @@ papertranslate-ui/dist/
 # Local development
 .vscode/
 vllm.log
+
+# Python environments
+.venv/
+venv/
+backend/.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Backend runtime uploads
+backend/uploads/*
+
+# Keep empty uploads directory if needed
+!backend/uploads/.gitkeep
+
+# Environment variables
+.env
+backend/.env
+papertranslate-ui/.env
+
+# Frontend generated files
+node_modules/
+dist/
