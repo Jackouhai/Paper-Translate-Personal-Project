@@ -1,6 +1,7 @@
 from pathlib import Path
 import shutil
 import requests
+import sys
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,9 +33,21 @@ app.add_middleware(
 BACKEND_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BACKEND_DIR.parent
 
-UPLOAD_DIR = BACKEND_DIR / "uploads"
-OUTPUT_DIR = BACKEND_DIR / "outputs"
-PIPELINE_OUTPUT_DIR = PROJECT_ROOT / "output"
+if getattr(sys, "frozen", False):
+    APP_DATA_DIR = (
+        Path.home()
+        / ".local"
+        / "share"
+        / "papertranslate"
+    )
+
+    UPLOAD_DIR = APP_DATA_DIR / "uploads"
+    OUTPUT_DIR = APP_DATA_DIR / "outputs"
+    PIPELINE_OUTPUT_DIR = APP_DATA_DIR / "output"
+else:
+    UPLOAD_DIR = BACKEND_DIR / "uploads"
+    OUTPUT_DIR = BACKEND_DIR / "outputs"
+    PIPELINE_OUTPUT_DIR = PROJECT_ROOT / "output"
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
