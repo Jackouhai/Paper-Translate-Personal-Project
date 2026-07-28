@@ -10,7 +10,13 @@ struct BackendProcess(Mutex<Option<Child>>);
 
 #[allow(unused_variables)]
 fn start_backend(app: &tauri::AppHandle) -> Result<Child, String> {
-    let (python_path, backend_script, working_dir): (PathBuf, PathBuf, PathBuf);
+    let (python_path, python_home, site_packages, backend_script, working_dir): (
+        PathBuf,
+        PathBuf,
+        PathBuf,
+        PathBuf,
+        PathBuf,
+    );
 
     #[cfg(debug_assertions)]
     {
@@ -23,11 +29,19 @@ fn start_backend(app: &tauri::AppHandle) -> Result<Child, String> {
             .canonicalize()
             .map_err(|error| format!("Could not resolve project root: {error}"))?;
 
-        python_path = project_root
-            .join("desktop-runtime")
+        let runtime_dir = project_root.join("desktop-runtime");
+
+        python_home = runtime_dir
+            .join("python")
+            .join("cpython-3.10.20-linux-x86_64-gnu");
+
+        python_path = python_home.join("bin").join("python3.10");
+
+        site_packages = runtime_dir
             .join("venv")
-            .join("bin")
-            .join("python");
+            .join("lib")
+            .join("python3.10")
+            .join("site-packages");
 
         backend_script = project_root.join("backend").join("run_backend.py");
 
@@ -41,11 +55,19 @@ fn start_backend(app: &tauri::AppHandle) -> Result<Child, String> {
             .resource_dir()
             .map_err(|error| format!("Could not resolve Tauri resource directory: {error}"))?;
 
-        python_path = resource_dir
-            .join("runtime")
+        let runtime_dir = resource_dir.join("runtime");
+
+        python_home = runtime_dir
+            .join("python")
+            .join("cpython-3.10.20-linux-x86_64-gnu");
+
+        python_path = python_home.join("bin").join("python3.10");
+
+        site_packages = runtime_dir
             .join("venv")
-            .join("bin")
-            .join("python");
+            .join("lib")
+            .join("python3.10")
+            .join("site-packages");
 
         backend_script = resource_dir.join("backend-app").join("run_backend.py");
 
@@ -56,6 +78,20 @@ fn start_backend(app: &tauri::AppHandle) -> Result<Child, String> {
         return Err(format!(
             "Bundled Python executable was not found: {}",
             python_path.display()
+        ));
+    }
+
+    if !python_home.exists() {
+        return Err(format!(
+            "Bundled Python home was not found: {}",
+            python_home.display()
+        ));
+    }
+
+    if !site_packages.exists() {
+        return Err(format!(
+            "Bundled Python site-packages was not found: {}",
+            site_packages.display()
         ));
     }
 
@@ -75,6 +111,8 @@ fn start_backend(app: &tauri::AppHandle) -> Result<Child, String> {
         .map_err(|error| format!("Could not create app data directory: {error}"))?;
 
     println!("Starting backend with Python: {}", python_path.display());
+    println!("Python home: {}", python_home.display());
+    println!("Python site-packages: {}", site_packages.display());
     println!("Backend script: {}", backend_script.display());
     println!("App data directory: {}", app_data_dir.display());
 
@@ -82,6 +120,8 @@ fn start_backend(app: &tauri::AppHandle) -> Result<Child, String> {
         .arg(&backend_script)
         .current_dir(&working_dir)
         .env("PYTHONUNBUFFERED", "1")
+        .env("PYTHONHOME", &python_home)
+        .env("PYTHONPATH", &site_packages)
         .env("PAPERTRANSLATE_DATA_DIR", &app_data_dir)
         .spawn()
         .map_err(|error| format!("Failed to start bundled Python backend: {error}"))
