@@ -51,3 +51,17 @@ dev = [
 
 [project.scripts]
 pp-doclayout = "pp_doclayout.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pp_doclayout = ["templates/*.html"]
