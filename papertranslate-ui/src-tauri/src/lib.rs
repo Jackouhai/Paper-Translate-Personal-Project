@@ -47,12 +47,9 @@ fn start_backend(app: &tauri::AppHandle) -> Result<Child, String> {
             .join("bin")
             .join("python");
 
-        backend_script = resource_dir
-            .join("app")
-            .join("backend")
-            .join("run_backend.py");
+        backend_script = resource_dir.join("backend-app").join("run_backend.py");
 
-        working_dir = resource_dir.join("app").join("backend");
+        working_dir = resource_dir.join("backend-app");
     }
 
     if !python_path.exists() {
@@ -69,13 +66,23 @@ fn start_backend(app: &tauri::AppHandle) -> Result<Child, String> {
         ));
     }
 
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Could not resolve app data directory: {error}"))?;
+
+    std::fs::create_dir_all(&app_data_dir)
+        .map_err(|error| format!("Could not create app data directory: {error}"))?;
+
     println!("Starting backend with Python: {}", python_path.display());
     println!("Backend script: {}", backend_script.display());
+    println!("App data directory: {}", app_data_dir.display());
 
     Command::new(&python_path)
         .arg(&backend_script)
         .current_dir(&working_dir)
         .env("PYTHONUNBUFFERED", "1")
+        .env("PAPERTRANSLATE_DATA_DIR", &app_data_dir)
         .spawn()
         .map_err(|error| format!("Failed to start bundled Python backend: {error}"))
 }

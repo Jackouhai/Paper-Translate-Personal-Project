@@ -26,9 +26,13 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "resources": [
-    "binaries/papertranslate-backend"
-    ],
+    "resources": {
+      "../../desktop-runtime": "runtime",
+      "../../backend/app.py": "backend-app/app.py",
+      "../../backend/run_backend.py": "backend-app/run_backend.py",
+      "../../backend/services/pipeline_service.py": "backend-app/services/pipeline_service.py",
+      "../../backend/services/__init__.py": "backend-app/services/__init__.py"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-import sys
+import os
 from pathlib import Path
 
 from pp_doclayout.cli import parse as run_parse
 from pp_doclayout.cli import translate as run_translate
 
 
-if getattr(sys, "frozen", False):
-    APP_DATA_DIR = (
-        Path.home()
-        / ".local"
-        / "share"
-        / "papertranslate"
-    )
+DATA_DIR_ENV = os.environ.get("PAPERTRANSLATE_DATA_DIR")
+
+if DATA_DIR_ENV:
+    APP_DATA_DIR = Path(DATA_DIR_ENV).expanduser().resolve()
     PIPELINE_OUTPUT_DIR = APP_DATA_DIR / "output"
 else:
     PROJECT_ROOT = Path(__file__).resolve().parents[2]
