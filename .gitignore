@@ -56,3 +56,6 @@ papertranslate-ui/.env
 # Frontend generated files
 node_modules/
 dist/
+
+# Bundled desktop Python runtime
+desktop-runtime/
