@@ -17,23 +17,58 @@ app = typer.Typer(
 def _create_paddle_ocr_pipeline():
     """Create the PaddleOCR-VL pipeline with explicit device selection."""
 
+    import traceback
+
     from paddleocr import PaddleOCRVL
 
     paddle_device = resolve_paddle_device(settings.paddle_ocr_client_device)
-    typer.echo(f"PaddleOCR document layout analysis model on device: {paddle_device}")
-
-    return PaddleOCRVL(
-        vl_rec_backend=settings.paddle_ocr_backend,
-        vl_rec_server_url=settings.paddle_ocr_server_url,
-        format_block_content=settings.paddle_ocr_format_block_content,
-        use_doc_unwarping=settings.paddle_ocr_use_doc_unwarping,
-        use_chart_recognition=settings.paddle_ocr_use_chart_recognition,
-        merge_layout_blocks=settings.paddle_ocr_merge_layout_blocks,
-        use_ocr_for_image_block=settings.paddle_use_ocr_for_image_block,
-        layout_detection_model_name=settings.paddle_ocr_layout_detection_model_name,
-        use_layout_detection=settings.paddle_ocr_use_layout_detection,
-        device=paddle_device,
+    typer.echo(
+        f"PaddleOCR document layout analysis model on device: {paddle_device}"
     )
+
+    try:
+        return PaddleOCRVL(
+            vl_rec_backend=settings.paddle_ocr_backend,
+            vl_rec_server_url=settings.paddle_ocr_server_url,
+            format_block_content=settings.paddle_ocr_format_block_content,
+            use_doc_unwarping=settings.paddle_ocr_use_doc_unwarping,
+            use_chart_recognition=settings.paddle_ocr_use_chart_recognition,
+            merge_layout_blocks=settings.paddle_ocr_merge_layout_blocks,
+            use_ocr_for_image_block=settings.paddle_use_ocr_for_image_block,
+            layout_detection_model_name=(
+                settings.paddle_ocr_layout_detection_model_name
+            ),
+            use_layout_detection=settings.paddle_ocr_use_layout_detection,
+            device=paddle_device,
+        )
+    except BaseException as exc:
+        typer.echo(
+            "\n=== PADDLE PIPELINE CREATION ERROR ===",
+            err=True,
+        )
+        traceback.print_exception(
+            type(exc),
+            exc,
+            exc.__traceback__,
+        )
+
+        cause = exc.__cause__
+        level = 1
+
+        while cause is not None:
+            typer.echo(
+                f"\n=== CAUSE LEVEL {level} ===",
+                err=True,
+            )
+            traceback.print_exception(
+                type(cause),
+                cause,
+                cause.__traceback__,
+            )
+            cause = cause.__cause__
+            level += 1
+
+        raise
 
 
 def _require_server(name: str, base_url: str) -> None:

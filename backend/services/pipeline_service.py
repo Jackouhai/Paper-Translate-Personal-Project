@@ -1,57 +1,48 @@
 from __future__ import annotations
 
-import subprocess
+import sys
 from pathlib import Path
 
+from pp_doclayout.cli import parse as run_parse
+from pp_doclayout.cli import translate as run_translate
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PROJECT_PYTHON = PROJECT_ROOT / ".venv" / "bin" / "python"
-PIPELINE_OUTPUT_DIR = PROJECT_ROOT / "output"
+
+if getattr(sys, "frozen", False):
+    APP_DATA_DIR = (
+        Path.home()
+        / ".local"
+        / "share"
+        / "papertranslate"
+    )
+    PIPELINE_OUTPUT_DIR = APP_DATA_DIR / "output"
+else:
+    PROJECT_ROOT = Path(__file__).resolve().parents[2]
+    PIPELINE_OUTPUT_DIR = PROJECT_ROOT / "output"
+
+PIPELINE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class PipelineError(RuntimeError):
-    """Raised when the pp_doclayout pipeline command fails."""
-
-
-def run_pipeline_command(
-    command: list[str],
-    timeout_seconds: int = 1800,
-) -> subprocess.CompletedProcess[str]:
-    full_command = [
-        str(PROJECT_PYTHON),
-        "-m",
-        "pp_doclayout.cli",
-        *command,
-    ]
-
-    try:
-        result = subprocess.run(
-            full_command,
-            cwd=PROJECT_ROOT,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise PipelineError(
-            f"Pipeline timed out after {timeout_seconds} seconds."
-        ) from exc
-
-    if result.returncode != 0:
-        error_message = result.stderr.strip() or result.stdout.strip()
-        raise PipelineError(error_message or "Pipeline command failed.")
-
-    return result
+    """Raised when the pp_doclayout pipeline fails."""
 
 
 def parse_pdf(pdf_path: Path) -> Path:
-    result = run_pipeline_command(
-        ["parse", str(pdf_path.resolve())],
-        timeout_seconds=1800,
-    )
+    pdf_path = pdf_path.resolve()
 
-    print(result.stdout)
+    try:
+        run_parse(
+            pdf_path=str(pdf_path),
+            output_dir=str(PIPELINE_OUTPUT_DIR),
+        )
+    except BaseException as exc:
+        message = str(exc).strip()
+
+        if not message:
+            message = f"{type(exc).__name__}: {exc!r}"
+
+        raise PipelineError(
+            f"Parse pipeline failed: {message}"
+        ) from exc
 
     project_name = pdf_path.stem
     project_dir = PIPELINE_OUTPUT_DIR / project_name
@@ -61,12 +52,15 @@ def parse_pdf(pdf_path: Path) -> Path:
             f"Parse completed but output directory was not found: {project_dir}"
         )
 
-    json_files = list(project_dir.glob("*_res.json"))
+    json_files = sorted(project_dir.glob("*_res.json"))
 
     if not json_files:
-        raise PipelineError("Parse completed but no OCR JSON file was created.")
+        raise PipelineError(
+            "Parse completed but no OCR JSON file was created."
+        )
 
     return project_dir
+
 
 def validate_project_name(project_name: str) -> str:
     clean_name = Path(project_name).name
@@ -96,16 +90,16 @@ def translate_project(project_name: str) -> Path:
             f"No parsed OCR JSON files were found in: {project_dir}"
         )
 
-    result = run_pipeline_command(
-        ["translate", str(project_dir)],
-        timeout_seconds=3600,
-    )
-
-    if result.stdout:
-        print(result.stdout)
-
-    if result.stderr:
-        print(result.stderr)
+    try:
+        run_translate(
+            project_dir=str(project_dir),
+            output_suffix="translated",
+            export_format="html",
+        )
+    except Exception as exc:
+        raise PipelineError(
+            f"Translation pipeline failed: {exc}"
+        ) from exc
 
     expected_html = project_dir / f"translated_{clean_name}.html"
 

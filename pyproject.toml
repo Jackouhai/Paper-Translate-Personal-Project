@@ -20,11 +20,12 @@ dependencies = [
     "vllm>=0.16.0",
     "pypdf",
     "paddleocr>=3.4.0",
-    "paddlex[ocr]>=3.4.3",
+    "paddlex[ocr]==3.5.2",
     "typing-extensions>=4.15.0",
     "bitsandbytes",
     "playwright>=1.60.0",
     "torch-c-dlpack-ext>=0.1.5",
+    "scikit-image>=0.25.2",
 ]
 
 [[tool.uv.index]]
