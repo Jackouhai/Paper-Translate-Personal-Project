@@ -122,16 +122,38 @@ const MOCK_HISTORY = [
   },
 ];
 
-function downloadFile(url, filename) {
+async function downloadFile(url, filename) {
+  if (!url) {
+    throw new Error("Download URL is missing");
+  }
+
+  const absoluteUrl = url.startsWith("http://") || url.startsWith("https://")
+    ? url
+    : `http://127.0.0.1:8002${url}`;
+
+  const response = await fetch(absoluteUrl);
+
+  if (!response.ok) {
+    throw new Error(
+      `Download failed with HTTP ${response.status}: ${response.statusText}`,
+    );
+  }
+
+  const blob = await response.blob();
+  const blobUrl = URL.createObjectURL(blob);
+
   const link = document.createElement("a");
-  link.href = url;
+  link.href = blobUrl;
   link.download = filename;
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
+  link.style.display = "none";
 
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+
+  window.setTimeout(() => {
+    URL.revokeObjectURL(blobUrl);
+  }, 1000);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -837,19 +859,21 @@ function TranslatePage() {
       setToast(error.message || "Pipeline failed");
     }
   };
-  const handleDownload = (label) => {
-    const outputName = projectName || file?.name?.replace(/\.pdf$/i, "") || "translated_document";
+  const handleDownload = async (label) => {
+    const outputName =
+      projectName ||
+      file?.name?.replace(/\.pdf$/i, "") ||
+      "translated_document";
 
+    try {
       if (label.includes("HTML")) {
         if (!resultUrls.html) {
           setToast("Translated HTML is not available yet");
           return;
         }
 
-        downloadFile(
-          resultUrls.html,
-          `${outputName}.html`,
-        );
+        await downloadFile(resultUrls.html, `${outputName}.html`);
+        setToast("HTML download started");
         return;
       }
 
@@ -861,13 +885,10 @@ function TranslatePage() {
           return;
         }
 
-        downloadFile(
-          resultUrls.markdown,
-          `${outputName}.md`,
-        );
+        await downloadFile(firstMarkdownUrl, `${outputName}.md`);
+        setToast("Markdown download started");
         return;
       }
-
 
       if (label.includes("PDF")) {
         if (!resultUrls.translatedPdf) {
@@ -875,14 +896,16 @@ function TranslatePage() {
           return;
         }
 
-        downloadFile(
-          resultUrls.translatedPdf,
-          `${outputName}.pdf`,
-        );
+        await downloadFile(resultUrls.translatedPdf, `${outputName}.pdf`);
+        setToast("PDF download started");
         return;
       }
 
       setToast(`${label} is not available yet`);
+    } catch (error) {
+      console.error("Download failed:", error);
+      setToast(error?.message || "Could not download file");
+    }
   };
 
   const isComplete = status === "complete";
