@@ -66,6 +66,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 pp_doclayout = ["templates/*.html"]
 [tool.pytest.ini_options]
+pythonpath = ["backend"]
 testpaths = ["tests"]
 norecursedirs = [
     ".git",
