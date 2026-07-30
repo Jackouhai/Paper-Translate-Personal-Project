@@ -4,7 +4,6 @@ import {
   FileText,
   Upload,
   Settings as SettingsIcon,
-  History as HistoryIcon,
   Info,
   CheckCircle2,
   Download,
@@ -34,7 +33,6 @@ const API_BASE_URL =
 
 const NAV_ITEMS = [
   { id: "translate", label: "Translate Document", icon: Languages },
-  { id: "history", label: "History", icon: HistoryIcon },
   { id: "settings", label: "Settings", icon: SettingsIcon },
   { id: "about", label: "About", icon: Info },
 ];
@@ -105,51 +103,7 @@ const MODEL_STATE_STYLES = {
   },
 };
 
-const MOCK_STATS = {
-  pages: 15,
-  figures: 22,
-  tables: 8,
-  formulas: 56,
-  translatedBlocks: 312,
-};
 
-const MOCK_HISTORY = [
-  {
-    fileName: "attention_is_all_you_need.pdf",
-    date: "2026-06-10",
-    model: "TranslateGemma 4B",
-    status: "Completed",
-    output: "HTML, PDF",
-  },
-  {
-    fileName: "deep_residual_learning.pdf",
-    date: "2026-06-08",
-    model: "HY-MT 1.8B",
-    status: "Completed",
-    output: "PDF, Markdown",
-  },
-  {
-    fileName: "bert_pretraining.pdf",
-    date: "2026-06-05",
-    model: "TranslateGemma 4B",
-    status: "Completed",
-    output: "HTML",
-  },
-  {
-    fileName: "gpt3_few_shot_learners.pdf",
-    date: "2026-06-01",
-    model: "TranslateGemma 4B",
-    status: "Failed",
-    output: "—",
-  },
-  {
-    fileName: "vision_transformer.pdf",
-    date: "2026-05-28",
-    model: "HY-MT 1.8B",
-    status: "Completed",
-    output: "HTML, PDF, Markdown",
-  },
-];
 
 async function downloadFile(url, filename) {
   if (!url) {
@@ -689,26 +643,8 @@ function KatexFormula({ tex, display = false }) {
   return <span ref={ref} className={display ? "block my-3 overflow-x-auto" : ""} />;
 }
 
-function StatCard({ label, value }) {
-  return (
-    <div className="bg-slate-50 rounded-lg p-3 text-center">
-      <p className="text-lg font-semibold text-slate-800">{value}</p>
-      <p className="text-xs text-slate-500 mt-0.5">{label}</p>
-    </div>
-  );
-}
-
-function ResultArea({ fileName, totalElapsed, exportFormat, onDownload, resultUrls }) {  
+function ResultArea({ exportFormat, onDownload, resultUrls }) {
   const [activeTab, setActiveTab] = useState("original");
-
-  const stats = [
-    { label: "Pages", value: MOCK_STATS.pages },
-    { label: "Figures", value: MOCK_STATS.figures },
-    { label: "Tables", value: MOCK_STATS.tables },
-    { label: "Formulas", value: MOCK_STATS.formulas },
-    { label: "Translated blocks", value: MOCK_STATS.translatedBlocks },
-    { label: "Processing time", value: `${(totalElapsed / 1000).toFixed(1)}s` },
-  ];
 
   const downloadButtons = [
     { id: "html", label: "Download HTML", icon: FileCode },
@@ -719,23 +655,15 @@ function ResultArea({ fileName, totalElapsed, exportFormat, onDownload, resultUr
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-xl p-5">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
             <CheckCircle2 className="w-5 h-5 text-emerald-500" />
           </div>
-          <div>
-            <p className="text-sm font-semibold text-slate-800">
-              Translation complete
-            </p>
-            <p className="text-xs text-slate-500">{fileName}</p>
-          </div>
+          <p className="text-sm font-semibold text-slate-800">
+            Translation complete
+          </p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {stats.map((s) => (
-            <StatCard key={s.label} label={s.label} value={s.value} />
-          ))}
-        </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -866,7 +794,7 @@ async function waitForTranslator() {
 /* Translate page                                                              */
 /* -------------------------------------------------------------------------- */
 
-function TranslatePage() {
+function TranslatePage({ onOpenSettings }) {
   const [file, setFile] = useState(null);
   const [config, setConfig] = useState({
     model: "translategemma",
@@ -1130,8 +1058,19 @@ function TranslatePage() {
       
       {pipelineStage === "waiting_for_translator" && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          OCR completed. Stop PaddleOCR-VL and start TranslateGemma.
-          Translation will continue automatically.
+          <p className="font-semibold">OCR and layout parsing completed.</p>
+          <p className="mt-1">
+            Stop PaddleOCR-VL and start TranslateGemma. Translation will
+            continue automatically after the translator becomes ready.
+          </p>
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100"
+          >
+            <SettingsIcon className="h-3.5 w-3.5" />
+            Open Model Settings
+          </button>
         </div>
       )}
 
@@ -1154,20 +1093,18 @@ function TranslatePage() {
 
       {(showResults || isComplete) && file && (
         <ResultArea
-          fileName={file.name}
-          totalElapsed={totalElapsed}
           exportFormat={config.exportFormat}
           onDownload={handleDownload}
           resultUrls={resultUrls}
         />
       )}
 
-      {(isProcessing || (isComplete && !showResults)) && (
+      {((isProcessing && pipelineStage !== "waiting_for_translator") ||
+        (isComplete && !showResults)) && (
         <ProgressModal
           steps={PROGRESS_STEPS}
           currentStepIndex={currentStepIndex}
           progressValues={progressValues}
-          totalElapsed={totalElapsed}
           isComplete={isComplete}
           onViewResults={() => setShowResults(true)}
         />
@@ -1177,73 +1114,6 @@ function TranslatePage() {
     </div>
   );
   }
-
-/* -------------------------------------------------------------------------- */
-/* History page                                                                */
-/* -------------------------------------------------------------------------- */
-
-function HistoryPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-800">History</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Previously translated documents and their export status.
-        </p>
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 bg-slate-50/60">
-              <th className="text-left font-medium text-slate-500 px-5 py-3">
-                File name
-              </th>
-              <th className="text-left font-medium text-slate-500 px-5 py-3">
-                Date
-              </th>
-              <th className="text-left font-medium text-slate-500 px-5 py-3">
-                Model
-              </th>
-              <th className="text-left font-medium text-slate-500 px-5 py-3">
-                Status
-              </th>
-              <th className="text-left font-medium text-slate-500 px-5 py-3">
-                Output
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {MOCK_HISTORY.map((row, idx) => (
-              <tr
-                key={idx}
-                className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/50"
-              >
-                <td className="px-5 py-3 text-slate-700 font-medium">
-                  {row.fileName}
-                </td>
-                <td className="px-5 py-3 text-slate-500">{row.date}</td>
-                <td className="px-5 py-3 text-slate-500">{row.model}</td>
-                <td className="px-5 py-3">
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      row.status === "Completed"
-                        ? "bg-emerald-50 text-emerald-600"
-                        : "bg-red-50 text-red-500"
-                    }`}
-                  >
-                    {row.status}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-slate-500">{row.output}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
 
 /* -------------------------------------------------------------------------- */
 /* Settings page                                                               */
@@ -1639,10 +1509,19 @@ export default function PaperTranslateApp() {
     <div className="flex min-h-screen bg-slate-50 font-sans">
       <Sidebar activePage={activePage} setActivePage={setActivePage} />
       <main className="flex-1 px-8 py-8 max-w-6xl">
-        {activePage === "translate" && <TranslatePage />}
-        {activePage === "history" && <HistoryPage />}
-        {activePage === "settings" && <SettingsPage />}
-        {activePage === "about" && <AboutPage />}
+        {/* Keep every page mounted. TranslatePage owns the active pipeline and
+            must not be unmounted while the user opens Settings to switch models. */}
+        <div className={activePage === "translate" ? "block" : "hidden"}>
+          <TranslatePage onOpenSettings={() => setActivePage("settings")} />
+        </div>
+
+        <div className={activePage === "settings" ? "block" : "hidden"}>
+          <SettingsPage />
+        </div>
+
+        <div className={activePage === "about" ? "block" : "hidden"}>
+          <AboutPage />
+        </div>
       </main>
     </div>
   );
