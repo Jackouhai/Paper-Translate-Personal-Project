@@ -12,6 +12,10 @@ from services.pipeline_service import (
     parse_pdf,
     translate_project,
 )
+from services.model_manager import (
+    ModelManagerError,
+    model_manager,
+)
 
 
 app = FastAPI(title="PaperTranslate Backend")
@@ -311,3 +315,67 @@ def get_model_status():
         "ocr_ready": ocr_ready,
         "translator_ready": translator_ready,
     }
+
+# =========================
+# Model process manager
+# =========================
+
+@app.get("/pipeline/model-manager/status")
+def get_model_manager_status():
+    return model_manager.status()
+
+
+@app.post("/pipeline/model-manager/ocr/start")
+def start_ocr_model():
+    try:
+        return {
+            "status": "accepted",
+            "model": model_manager.ocr.start(),
+        }
+    except ModelManagerError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+
+@app.post("/pipeline/model-manager/ocr/stop")
+def stop_ocr_model():
+    try:
+        return {
+            "status": "stopped",
+            "model": model_manager.ocr.stop(),
+        }
+    except ModelManagerError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+
+@app.post("/pipeline/model-manager/translator/start")
+def start_translator_model():
+    try:
+        return {
+            "status": "accepted",
+            "model": model_manager.translator.start(),
+        }
+    except ModelManagerError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+
+@app.post("/pipeline/model-manager/translator/stop")
+def stop_translator_model():
+    try:
+        return {
+            "status": "stopped",
+            "model": model_manager.translator.stop(),
+        }
+    except ModelManagerError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc

@@ -31,6 +31,9 @@
       "../../backend/app.py": "backend-app/app.py",
       "../../backend/run_backend.py": "backend-app/run_backend.py",
       "../../backend/services/pipeline_service.py": "backend-app/services/pipeline_service.py",
+      "../../backend/services/__init__.py": "backend-app/services/__init__.py",
+      "../../backend/services/pipeline_service.py": "backend-app/services/pipeline_service.py",
+      "../../backend/services/model_manager.py": "backend-app/services/model_manager.py",
       "../../backend/services/__init__.py": "backend-app/services/__init__.py"
     },
     "icon": [

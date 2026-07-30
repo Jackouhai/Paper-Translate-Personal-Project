@@ -8,7 +8,7 @@ vllm serve PaddlePaddle/PaddleOCR-VL-1.5 \
     --max-model-len 16384 \
     --max-num-seqs 30 \
     --max-num-batched-tokens 8192 \
-    --gpu-memory-utilization 0.2 \
+    --gpu-memory-utilization 0.5 \
     --enforce-eager \
     --no-enable-prefix-caching \
     --mm-processor-cache-gb 0 \
