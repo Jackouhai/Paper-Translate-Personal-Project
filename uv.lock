@@ -2282,7 +2282,7 @@ wheels = [
 [[package]]
 name = "pp-doclayout-v1-0"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "bitsandbytes", marker = "sys_platform == 'linux'" },
     { name = "fastapi", marker = "sys_platform == 'linux'" },
