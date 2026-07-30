@@ -329,18 +329,51 @@ class ModelManager:
             "translator": self.translator.status(),
         }
 
-    def stop_all(self) -> None:
+    def stop_all(self) -> dict[str, Any]:
+        results: dict[str, Any] = {}
+
+        # Stop the translator first so GPU memory begins to be
+        # released before the OCR service is stopped.
         for model in (
             self.translator,
             self.ocr,
         ):
+            model_name = model.config.name
+
             try:
-                model.stop()
-            except ModelManagerError:
-                # External processes must remain untouched.
-                pass
+                current_status = model.status()
+
+                if current_status["process_state"] == "external":
+                    results[model_name] = {
+                        "action": "skipped_external",
+                        "model": current_status,
+                    }
+                    continue
+
+                if not current_status["owned_by_app"]:
+                    results[model_name] = {
+                        "action": "already_stopped",
+                        "model": current_status,
+                    }
+                    continue
+
+                results[model_name] = {
+                    "action": "stopped",
+                    "model": model.stop(),
+                }
+
+            except Exception as exc:
+                # A failure stopping one model must not prevent the
+                # application from attempting to stop the other model.
+                results[model_name] = {
+                    "action": "failed",
+                    "error": str(exc),
+                }
+
+        return results
 
 
 model_manager = ModelManager()
 
 atexit.register(model_manager.stop_all)
+

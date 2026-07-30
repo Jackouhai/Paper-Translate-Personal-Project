@@ -379,3 +379,18 @@ def stop_translator_model():
             status_code=409,
             detail=str(exc),
         ) from exc
+
+
+@app.post("/pipeline/model-manager/shutdown")
+def shutdown_managed_models():
+    """
+    Stop every model process started and owned by PaperTranslate.
+
+    Models started outside PaperTranslate are left untouched.
+    Calling this endpoint when the models are already stopped is safe.
+    """
+
+    return {
+        "status": "completed",
+        "models": model_manager.stop_all(),
+    }

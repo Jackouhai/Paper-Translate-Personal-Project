@@ -1,7 +1,10 @@
 use std::{
+    io::{Read, Write},
+    net::{SocketAddr, TcpStream},
     path::PathBuf,
     process::{Child, Command},
     sync::Mutex,
+    time::Duration,
 };
 
 use tauri::{Manager, RunEvent};
@@ -127,7 +130,56 @@ fn start_backend(app: &tauri::AppHandle) -> Result<Child, String> {
         .map_err(|error| format!("Failed to start bundled Python backend: {error}"))
 }
 
+fn shutdown_managed_models() -> Result<(), String> {
+    let address = SocketAddr::from(([127, 0, 0, 1], 8002));
+
+    let mut stream = TcpStream::connect_timeout(&address, Duration::from_secs(2))
+        .map_err(|error| format!("Could not connect to backend for cleanup: {error}"))?;
+
+    stream
+        .set_read_timeout(Some(Duration::from_secs(50)))
+        .map_err(|error| format!("Could not set cleanup read timeout: {error}"))?;
+
+    stream
+        .set_write_timeout(Some(Duration::from_secs(5)))
+        .map_err(|error| format!("Could not set cleanup write timeout: {error}"))?;
+
+    let request = concat!(
+        "POST /pipeline/model-manager/shutdown HTTP/1.1\r\n",
+        "Host: 127.0.0.1:8002\r\n",
+        "Connection: close\r\n",
+        "Content-Length: 0\r\n",
+        "\r\n"
+    );
+
+    stream
+        .write_all(request.as_bytes())
+        .map_err(|error| format!("Could not send model cleanup request: {error}"))?;
+
+    let mut response = String::new();
+
+    stream
+        .read_to_string(&mut response)
+        .map_err(|error| format!("Could not read model cleanup response: {error}"))?;
+
+    if response.starts_with("HTTP/1.1 200") || response.starts_with("HTTP/1.0 200") {
+        println!("Managed model cleanup completed.");
+        return Ok(());
+    }
+
+    Err(format!(
+        "Backend cleanup returned an unsuccessful response: {}",
+        response.lines().next().unwrap_or("empty response")
+    ))
+}
+
 fn stop_backend(app_handle: &tauri::AppHandle) {
+    // Ask the still-running backend to stop its owned model
+    // processes before terminating the backend itself.
+    if let Err(error) = shutdown_managed_models() {
+        eprintln!("{error}");
+    }
+
     let backend_state = app_handle.state::<BackendProcess>();
 
     let Ok(mut process_guard) = backend_state.0.lock() else {
