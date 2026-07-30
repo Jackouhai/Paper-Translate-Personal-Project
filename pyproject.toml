@@ -65,3 +65,14 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 pp_doclayout = ["templates/*.html"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = [
+    ".git",
+    ".venv",
+    "node_modules",
+    "target",
+    "dist",
+    "build",
+    "runtime",
+]
