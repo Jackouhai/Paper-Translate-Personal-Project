@@ -1,4 +1,5 @@
-  import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useModelManager } from "./hooks/useModelManager";
 import {
   FileText,
   Upload,
@@ -17,6 +18,11 @@ import {
   ScanLine,
   Layers,
   Eye,
+  Play,
+  Square,
+  RefreshCw,
+  AlertCircle,
+  Server,
 } from "lucide-react";
 
 const API_BASE_URL =
@@ -75,6 +81,29 @@ const PROGRESS_STEPS = [
   { id: "reconstruction", label: "Document Reconstruction", fakeDuration: 2200 },
   { id: "export", label: "Export", fakeDuration: 1400 },
 ];
+
+const MODEL_STATE_STYLES = {
+  stopped: {
+    label: "Stopped",
+    className: "bg-slate-100 text-slate-600",
+  },
+  starting: {
+    label: "Starting",
+    className: "bg-amber-50 text-amber-700",
+  },
+  ready: {
+    label: "Ready",
+    className: "bg-emerald-50 text-emerald-700",
+  },
+  failed: {
+    label: "Failed",
+    className: "bg-red-50 text-red-700",
+  },
+  external: {
+    label: "Running externally",
+    className: "bg-purple-50 text-purple-700",
+  },
+};
 
 const MOCK_STATS = {
   pages: 15,
@@ -230,7 +259,146 @@ function SectionCard({ title, icon: Icon, children, className = "" }) {
     </div>
   );
 }
+function ModelStatusBadge({ state }) {
+  const style =
+    MODEL_STATE_STYLES[state] ||
+    MODEL_STATE_STYLES.stopped;
 
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${style.className}`}
+    >
+      {state === "starting" && (
+        <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+      )}
+
+      {style.label}
+    </span>
+  );
+}
+
+function ModelControlCard({
+  title,
+  description,
+  model,
+  loading,
+  onStart,
+  onStop,
+}) {
+  const state = model?.process_state || "stopped";
+
+  const startDisabled =
+    loading ||
+    state === "starting" ||
+    state === "ready" ||
+    state === "external";
+
+  const stopDisabled =
+    loading ||
+    state === "starting" ||
+    state === "stopped" ||
+    state === "failed" ||
+    state === "external";
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Server className="h-4 w-4 text-blue-600" />
+
+            <h3 className="text-sm font-semibold text-slate-800">
+              {title}
+            </h3>
+
+            <ModelStatusBadge state={state} />
+          </div>
+
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">
+            {description}
+          </p>
+
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
+            <span>
+              Port:{" "}
+              <strong className="font-medium text-slate-700">
+                {model?.port ?? "—"}
+              </strong>
+            </span>
+
+            <span>
+              PID:{" "}
+              <strong className="font-medium text-slate-700">
+                {model?.pid ?? "—"}
+              </strong>
+            </span>
+
+            <span>
+              Managed by app:{" "}
+              <strong className="font-medium text-slate-700">
+                {model?.owned_by_app ? "Yes" : "No"}
+              </strong>
+            </span>
+          </div>
+
+          {state === "external" && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-purple-200 bg-purple-50 p-3 text-xs text-purple-700">
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+
+              <span>
+                This model was started outside PaperTranslate.
+                The app will not stop or replace the external process.
+              </span>
+            </div>
+          )}
+
+          {model?.last_error && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+
+              <span>{model.last_error}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={onStart}
+            disabled={startDisabled}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+              startDisabled
+                ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                : "bg-blue-600 text-white hover:bg-blue-700"
+            }`}
+          >
+            {loading && state !== "ready" ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Play className="h-3.5 w-3.5" />
+            )}
+
+            Start
+          </button>
+
+          <button
+            type="button"
+            onClick={onStop}
+            disabled={stopDisabled}
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+              stopDisabled
+                ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                : "border-red-200 bg-white text-red-600 hover:bg-red-50"
+            }`}
+          >
+            <Square className="h-3.5 w-3.5" />
+            Stop
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 /* -------------------------------------------------------------------------- */
 /* Upload section                                                              */
 /* -------------------------------------------------------------------------- */
@@ -733,7 +901,7 @@ function TranslatePage() {
     originalPdf: null,
     translatedPdf: null,
     html: null,
-    markdownUrls: null,
+    markdownUrls: [],
     jsonUrls: [],
   });
 
@@ -1084,89 +1252,223 @@ function HistoryPage() {
 function SettingsPage() {
   const [theme, setTheme] = useState("light");
   const [language, setLanguage] = useState("english");
-  const [defaultModel, setDefaultModel] = useState("translategemma");
-  const [defaultExport, setDefaultExport] = useState("html");
+  const [defaultModel, setDefaultModel] =
+    useState("translategemma");
+  const [defaultExport, setDefaultExport] =
+    useState("html");
+
+  const {
+    status: modelStatus,
+    loading: modelLoading,
+    error: modelManagerError,
+    refreshStatus,
+    startModel,
+    stopModel,
+  } = useModelManager();
+
+  const [modelActionError, setModelActionError] =
+    useState(null);
 
   const fieldClass =
     "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400";
 
+  const handleModelAction = async (
+    modelName,
+    action,
+  ) => {
+    setModelActionError(null);
+
+    try {
+      if (action === "start") {
+        await startModel(modelName);
+      } else {
+        await stopModel(modelName);
+      }
+    } catch (error) {
+      setModelActionError(
+        error?.message || "Model action failed",
+      );
+    }
+  };
+
+  const displayedError =
+    modelActionError || modelManagerError;
+
   return (
-    <div className="space-y-6 max-w-xl">
+    <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-800">Settings</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Configure default preferences for the application.
+        <h1 className="text-xl font-semibold text-slate-800">
+          Settings
+        </h1>
+
+        <p className="mt-1 text-sm text-slate-500">
+          Configure application preferences and local AI
+          model services.
         </p>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            Theme
-          </label>
-          <select
-            value={theme}
-            onChange={(e) => setTheme(e.target.value)}
-            className={fieldClass}
-          >
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-            <option value="system">System</option>
-          </select>
-        </div>
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <h2 className="mb-4 text-sm font-semibold text-slate-800">
+          Application preferences
+        </h2>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            Interface language
-          </label>
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            className={fieldClass}
-          >
-            <option value="english">English</option>
-            <option value="vietnamese">Vietnamese</option>
-          </select>
-        </div>
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Theme
+            </label>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            Default translation model
-          </label>
-          <select
-            value={defaultModel}
-            onChange={(e) => setDefaultModel(e.target.value)}
-            className={fieldClass}
-          >
-            {TRANSLATION_MODELS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
+            <select
+              value={theme}
+              onChange={(event) =>
+                setTheme(event.target.value)
+              }
+              className={fieldClass}
+            >
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="system">System</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Interface language
+            </label>
+
+            <select
+              value={language}
+              onChange={(event) =>
+                setLanguage(event.target.value)
+              }
+              className={fieldClass}
+            >
+              <option value="english">English</option>
+              <option value="vietnamese">
+                Vietnamese
               </option>
-            ))}
-          </select>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Default translation model
+            </label>
+
+            <select
+              value={defaultModel}
+              onChange={(event) =>
+                setDefaultModel(event.target.value)
+              }
+              className={fieldClass}
+            >
+              {TRANSLATION_MODELS.map((model) => (
+                <option
+                  key={model.id}
+                  value={model.id}
+                >
+                  {model.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Default export format
+            </label>
+
+            <select
+              value={defaultExport}
+              onChange={(event) =>
+                setDefaultExport(event.target.value)
+              }
+              className={fieldClass}
+            >
+              {EXPORT_FORMATS.map((format) => (
+                <option
+                  key={format.id}
+                  value={format.id}
+                >
+                  {format.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-800">
+              Model management
+            </h2>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Start and stop local OCR and translation
+              services.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={refreshStatus}
+            className="inline-flex items-center gap-2 self-start rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Refresh status
+          </button>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            Default export format
-          </label>
-          <select
-            value={defaultExport}
-            onChange={(e) => setDefaultExport(e.target.value)}
-            className={fieldClass}
-          >
-            {EXPORT_FORMATS.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.label}
-              </option>
-            ))}
-          </select>
+        {displayedError && (
+          <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            <span>{displayedError}</span>
+          </div>
+        )}
+
+        <ModelControlCard
+          title="PaddleOCR-VL"
+          description="Detects document layout and extracts text, tables, figures, formulas, and other visual elements."
+          model={modelStatus.ocr}
+          loading={modelLoading.ocr}
+          onStart={() =>
+            handleModelAction("ocr", "start")
+          }
+          onStop={() =>
+            handleModelAction("ocr", "stop")
+          }
+        />
+
+        <ModelControlCard
+          title="TranslateGemma 4B"
+          description="Translates extracted scientific document content from English into Vietnamese."
+          model={modelStatus.translator}
+          loading={modelLoading.translator}
+          onStart={() =>
+            handleModelAction(
+              "translator",
+              "start",
+            )
+          }
+          onStop={() =>
+            handleModelAction(
+              "translator",
+              "stop",
+            )
+          }
+        />
+
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-800">
+          On GPUs with limited VRAM, run only one model at a
+          time. Stop PaddleOCR-VL before starting
+          TranslateGemma.
         </div>
       </div>
     </div>
   );
 }
-
 /* -------------------------------------------------------------------------- */
 /* About page                                                                  */
 /* -------------------------------------------------------------------------- */
