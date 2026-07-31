@@ -15,10 +15,11 @@ NO_TRANSLATE_LABELS = frozenset(
         "display_formula",
         "inline_formula",
         "formula_number",
+        "number"
     ]
 )
 
-SKIP_LABELS = frozenset(["aside_text", "header", "footer", "number", "content"])
+SKIP_LABELS = frozenset(["aside_text", "header", "footer", "content"])
 
 TRANSLATE_LABELS = frozenset(["abstract", "text", "figure_title"])
 

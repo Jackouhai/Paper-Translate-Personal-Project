@@ -79,17 +79,8 @@ uv run -m pp_doclayout.cli run paper.pdf
 
 Nếu kiểm tra PaddlePaddle fail, sửa Paddle/CUDA trước khi chạy `parse` hoặc `run`.
 
-Output: `output/paper/translated_paper.html`
-
-```bash
-# Xuất PDF thay vì HTML
-uv run -m pp_doclayout.cli run paper.pdf -f pdf
-
-# Hoặc dịch dữ liệu đã parse sang PDF
-uv run -m pp_doclayout.cli translate output/paper -f pdf
-```
-
-Output: `output/paper/translated_paper.pdf`
+Lệnh mặc định xuất đồng thời `output/paper/translated_paper.html` và
+`output/paper/translated_paper.pdf`.
 
 Mặc định, PDF export dùng Chromium do Playwright quản lý. Để dùng browser đã
 cài trên hệ thống, đặt browser channel trong `.env`:
@@ -100,6 +91,56 @@ PPDOCLAYOUT_PLAYWRIGHT_BROWSER_CHANNEL=chrome
 
 CSS dành cho chế độ in ánh xạ mỗi trang HTML đã parse thành một trang PDF,
 đồng thời loại bỏ margin và shadow chỉ phục vụ giao diện xem trên màn hình.
+
+## Triển khai Docker để demo
+
+Dùng Docker khi demo trên máy Linux khác, hoặc Windows có Docker Desktop chạy
+Linux containers qua WSL2 và hỗ trợ NVIDIA GPU. Docker đã đóng gói Python, CUDA
+runtime, vLLM, PaddleOCR và Playwright; máy demo không cần cài môi trường `uv`
+cục bộ.
+
+Trước khi build, xác nhận Docker nhìn thấy GPU của máy host:
+
+```bash
+nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04 nvidia-smi
+```
+
+Build image, khởi động hai model server, đợi trạng thái `healthy`, rồi chạy
+pipeline. Lần khởi động server đầu tiên sẽ tải model vào Docker volume.
+
+```bash
+docker compose build
+docker compose up -d paddle-ocr-vl translate-gemma
+docker compose ps
+docker compose run --rm pipeline run input/PhoMT.pdf
+```
+
+`input/` và `output/` vẫn nằm trên máy host. Để giảm VRAM dùng đồng thời, chạy
+từng bước và tắt model thứ nhất trước khi chạy model thứ hai:
+
+```bash
+docker compose up -d paddle-ocr-vl
+docker compose run --rm --no-deps pipeline parse input/PhoMT.pdf
+docker compose stop paddle-ocr-vl
+
+docker compose up -d translate-gemma
+docker compose run --rm --no-deps pipeline translate output/PhoMT
+docker compose stop translate-gemma
+```
+
+Dừng container nhưng giữ cache model đã tải:
+
+```bash
+docker compose down
+```
+
+Cấu hình Docker hiện tại dành cho NVIDIA GPU đời mới. Image đã được build và
+smoke-test trên máy phát triển; RTX 3060 12 GB cần profile giảm bộ nhớ riêng
+trước khi được xem là máy demo hỗ trợ chính thức. RTX 4060 8 GB phù hợp parse,
+render hoặc làm client gọi server dịch từ máy khác. Quadro P3200 không được hỗ
+trợ bởi stack vLLM/CUDA hiện tại. Xem hướng dẫn đầy đủ tại
+[docker/README.md](docker/README.md).
 
 ---
 
@@ -161,27 +202,27 @@ Kết quả lưu tại `output/<tên_file>/`:
 Cần TranslateGemma server (port 8001).
 
 ```bash
-# Xuất HTML (mặc định)
+# Xuất cả HTML và PDF (mặc định)
 uv run -m pp_doclayout.cli translate output/<tên_file>
 
-# Xuất PDF
+# Chỉ xuất PDF
 uv run -m pp_doclayout.cli translate output/<tên_file> -f pdf
 
 # Hậu tố file tùy chỉnh
 uv run -m pp_doclayout.cli translate output/<tên_file> --suffix vi
 ```
 
-Kết quả: `output/<tên_file>/translated_<tên_file>.html` hoặc `.pdf`
+Mặc định tạo: `output/<tên_file>/translated_<tên_file>.html` và `.pdf`
 
 ### Full Pipeline
 
 Chạy parse + translate trong 1 lệnh. Cần cả 2 servers chạy cùng lúc.
 
 ```bash
-# Xuất HTML (mặc định)
+# Xuất cả HTML và PDF (mặc định)
 uv run -m pp_doclayout.cli run <file.pdf>
 
-# Xuất PDF
+# Chỉ xuất PDF
 uv run -m pp_doclayout.cli run <file.pdf> -f pdf
 ```
 
@@ -199,7 +240,7 @@ Pipeline sử dụng 2 mô hình, mỗi mô hình chạy trên 1 vLLM server ri�
 | Model | Size | Port | Chức năng |
 |-------|------|------|-----------|
 | **PaddleOCR-VL** | 0.9B | 8000 | Phân tích layout, OCR, crop images |
-| **TranslateGemma** | 4B (bitsandbytes quantized) | 8001 | Dịch Anh → Việt |
+| **TranslateGemma** | 4B (cấu hình vLLM FP8) | 8001 | Dịch Anh → Việt |
 
 ### Kiểm tra servers
 
@@ -213,8 +254,8 @@ curl http://127.0.0.1:8001/v1/models
 | Action | Labels | Mô tả |
 |--------|--------|-------|
 | **Dịch** | `abstract`, `text`, `figure_title` | Nội dung chính |
-| **Giữ nguyên** | `doc_title`, `paragraph_title`, `reference_content`, `footnote`, `display_formula`, `table`, `image`, `chart`, `formula_number` | Tiêu đề, references, công thức |
-| **Bỏ qua** | `aside_text`, `header`, `footer`, `number` | Nhiễu, số trang |
+| **Giữ nguyên** | `doc_title`, `paragraph_title`, `reference_content`, `footnote`, `display_formula`, `table`, `image`, `chart`, `formula_number`, `number` | Tiêu đề, references, công thức, số trang |
+| **Bỏ qua** | `aside_text`, `header`, `footer`, `content` | Block nhiễu |
 
 ## Cấu trúc Project
 

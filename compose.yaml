@@ -1,0 +1,82 @@
+name: pp-doclayout
+
+x-gpu-service: &gpu-service
+  gpus: all
+  ipc: host
+
+services:
+  translate-gemma:
+    <<: *gpu-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.vllm
+    command: ["bash", "scripts/start_translate_gemma.sh"]
+    ports:
+      - "8001:8001"
+    environment:
+      HF_HOME: /models/huggingface
+    volumes:
+      - hf-cache:/models/huggingface
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python3.10 -c \"from urllib.request import urlopen; urlopen('http://127.0.0.1:8001/v1/models', timeout=5)\"",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    restart: unless-stopped
+
+  paddle-ocr-vl:
+    <<: *gpu-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.vllm
+    command: ["bash", "scripts/start_paddle_ocr_vl.sh"]
+    ports:
+      - "8000:8000"
+    environment:
+      HF_HOME: /models/huggingface
+    volumes:
+      - hf-cache:/models/huggingface
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python3.10 -c \"from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/v1/models', timeout=5)\"",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    restart: unless-stopped
+
+  pipeline:
+    <<: *gpu-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.pipeline
+    depends_on:
+      paddle-ocr-vl:
+        condition: service_healthy
+      translate-gemma:
+        condition: service_healthy
+    environment:
+      PPDOCLAYOUT_OUTPUT_DIR: output
+      PPDOCLAYOUT_PADDLE_OCR_SERVER_URL: http://paddle-ocr-vl:8000/v1
+      PPDOCLAYOUT_VLLM_BASE_URL: http://translate-gemma:8001/v1
+      PPDOCLAYOUT_PADDLE_OCR_CLIENT_DEVICE: auto
+      PPDOCLAYOUT_PADDLE_OCR_USE_CHART_RECOGNITION: "false"
+      HF_HOME: /models/huggingface
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+    volumes:
+      - ./input:/app/input
+      - ./output:/app/output
+      - hf-cache:/models/huggingface
+    command: ["--help"]
+
+volumes:
+  hf-cache:
+    name: pp-doclayout-hf-cache

@@ -1,0 +1,14 @@
+# Keep the Docker build context reproducible and small.
+.git/
+.venv/
+services/llm-server/.venv/
+.env
+input/
+output/
+output.zip
+__pycache__/
+*.py[oc]
+.pytest_cache/
+.mypy_cache/
+frontend_project/node_modules/
+frontend_project/dist/

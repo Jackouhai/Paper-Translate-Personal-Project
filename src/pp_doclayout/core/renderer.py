@@ -257,8 +257,16 @@ def render_page_blocks(
     # Sort by block_id to maintain order
     blocks.sort(key=lambda b: b.get("block_id", float("inf")))
 
+    renderable_blocks = [
+        block
+        for block in blocks
+        if should_translate(
+            block.get("block_label", ""), block.get("block_content", "")
+        ) != "skip"
+    ]
+
     # Render ALL blocks
-    html_blocks = build_html(blocks, imgs_dir=imgs_dir, output_dir=output_dir)
+    html_blocks = build_html(renderable_blocks, imgs_dir=imgs_dir, output_dir=output_dir)
 
     page_html = f"""
     <div class="page-container">

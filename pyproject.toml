@@ -5,7 +5,7 @@ description = "Pipeline dịch paper học thuật sang tiếng Việt"
 readme = "README.md"
 requires-python = ">=3.10,<3.12"
 dependencies = [
-    "paddlepaddle-gpu==3.3.0",
+    "paddlepaddle-gpu==3.3.1",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "python-multipart>=0.0.9",
@@ -41,6 +41,10 @@ environments = ["sys_platform == 'linux'"]
 index-strategy = "unsafe-best-match"
 [tool.uv.sources]
 paddlepaddle-gpu = { index = "paddlepaddle" } 
+
+[tool.uv.workspace]
+members = []
+exclude = ["services/llm-server"]
 
 [dependency-groups]
 dev = [

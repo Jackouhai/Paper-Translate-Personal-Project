@@ -1,5 +1,3 @@
-from functools import cached_property
-
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -21,25 +19,22 @@ class Settings(BaseSettings):
         env_prefix="PPDOCLAYOUT_",
     )
 
-    # ===== Engine Settings =====
-    engine: str = "gemma"
-
     # ===== vLLM/Gemma Server Settings =====
     vllm_base_url: str = Field(
         default="http://127.0.0.1:8001/v1",
         description="Base URL for vLLM server"
     )
-    vllm_max_tokens: int = Field(
-        default=16384,
-        description="Maximum tokens for generation"
+    vllm_context_window: int = Field(
+        default=4096,
+        description="Total prompt and output token limit configured on vLLM",
     )
-    vllm_min_output_tokens: int = Field(
-        default=512,
-        description="Minimum max_tokens for a translation request"
+    translation_max_input_tokens: int = Field(
+        default=2048,
+        description="TranslateGemma publisher-declared maximum input context",
     )
-    vllm_output_token_multiplier: float = Field(
-        default=2.5,
-        description="Estimated output token multiplier based on input length"
+    vllm_chat_template_reserve: int = Field(
+        default=256,
+        description="Conservative token reserve for the chat template",
     )
     vllm_retry_attempts: int = Field(
         default=2,
@@ -106,23 +101,6 @@ class Settings(BaseSettings):
         default="output",
         description="Base output directory"
     )   
-
-    # ===== Export Settings =====
-    # Note: In .env file, use: PPDOCLAYOUT_EXPORT_FORMATS=html,pdf,markdown
-    # The property export_formats returns a parsed list
-    export_formats_raw: str = Field(
-        default="html,pdf",
-        description="Export formats (comma-separated: html,pdf,markdown)"
-    )
-
-    @cached_property
-    def export_formats(self) -> list[str]:
-        """Parse export_formats from comma-separated string.
-
-        Returns:
-            List of export formats
-        """
-        return [f.strip() for f in self.export_formats_raw.split(",")]
 
     playwright_browser_channel: str | None = Field(
         default=None,

@@ -8,23 +8,27 @@ from .base import BaseTranslator
 
 logger = logging.getLogger(__name__)
 
+_LANGUAGE_NAMES = {
+    "en": "English",
+    "vi": "Vietnamese",
+}
+
 
 class GemmaTranslator(BaseTranslator):
     def __init__(
         self,
         base_url: str | None = None,
         model_name: str | None = None,
-        max_tokens: int | None = None,
         max_concurrent_requests: int | None = None
     ):
         from ..config import settings
 
         self.base_url = base_url or settings.vllm_base_url
         self.model_name = model_name or settings.vllm_model_name
-        self.max_tokens = max_tokens or settings.vllm_max_tokens
+        self.context_window = settings.vllm_context_window
+        self.chat_template_reserve = settings.vllm_chat_template_reserve
+        self.max_input_tokens = settings.translation_max_input_tokens
         self.max_concurrent_requests = max_concurrent_requests or settings.max_concurrent_requests
-        self.min_output_tokens = settings.vllm_min_output_tokens
-        self.output_token_multiplier = settings.vllm_output_token_multiplier
         self.retry_attempts = settings.vllm_retry_attempts
 
         self.client = OpenAI(base_url=self.base_url, api_key="unused")
@@ -38,10 +42,20 @@ class GemmaTranslator(BaseTranslator):
         Returns:
             int: tokens length
         """
-        estimated_input_tokens = max(1, len(text.split()) * 2)
-        estimated_output_tokens = int(estimated_input_tokens * self.output_token_multiplier)
-        request_max_tokens = max(self.min_output_tokens, estimated_output_tokens)
-        return min(self.max_tokens, request_max_tokens)
+        estimated_source_tokens = max(1, len(text.split()) * 2)
+        estimated_prompt_tokens = (
+            estimated_source_tokens + self.chat_template_reserve
+        )
+
+        if estimated_prompt_tokens > self.max_input_tokens:
+            raise ValueError(
+                "Translation block exceeds TranslateGemma's 2048 token input limit"
+            )
+        available_output_tokens = (
+            self.context_window - estimated_prompt_tokens
+        )
+
+        return (available_output_tokens)
 
     def translate(
         self, text: str, source_lang: str = "en", target_lang: str = "vi"
@@ -49,10 +63,24 @@ class GemmaTranslator(BaseTranslator):
         if not text or not text.strip():
             return ""
 
+        source_language = _LANGUAGE_NAMES.get(source_lang, source_lang)
+        target_language = _LANGUAGE_NAMES.get(target_lang, target_lang)
+        translation_prompt = (
+            f"You are a professional {source_language} ({source_lang}) to "
+            f"{target_language} ({target_lang}) translator research paper. Your goal is to "
+            f"accurately convey the meaning and nuances of the original "
+            f"{source_language} text while adhering to {target_language} grammar, "
+            "vocabulary, and cultural sensitivities. Warning: Do not use Arabic laguange. The following text is an "
+            "excerpt from a technical academic research paper. Produce only the "
+            f"{target_language} translation, without any additional explanations "
+            f"or commentary. Please translate the following {source_language} "
+            f"text into {target_language}:\n\n{text}"
+        )
+
         messages = [
             {
                 "role": "user",
-                "content": f"<<<source>>>{source_lang}<<<target>>>{target_lang}<<<text>>>{text}",
+                "content": f"<<<custom>>>{translation_prompt}",
             }
         ]
 
