@@ -13,6 +13,54 @@ app = typer.Typer(
     add_completion=False,
 )
 
+DEFAULT_EXPORT_FORMATS = "html,pdf"
+SUPPORTED_EXPORT_FORMATS = frozenset({"html", "pdf"})
+
+def _parse_export_formats(value: str) -> list[str]:
+    formats = [
+        export_format.strip().lower()
+        for export_format in value.split(",")
+        if export_format.strip()
+    ]
+
+    if not formats:
+        raise typer.BadParameter(
+            "Export format must contain html, pdf, or both."
+        )
+
+    invalid_formats = set(formats) - SUPPORTED_EXPORT_FORMATS
+    if invalid_formats:
+        invalid = ", ".join(sorted(invalid_formats))
+        raise typer.BadParameter(f"Unsupported export format: {invalid}")
+
+    return list(dict.fromkeys(formats))
+
+def _export_project(
+    project_data,
+    project_dir: Path,
+    output_suffix: str,
+    export_formats: str,
+) -> list[Path]:
+    output_paths = []
+
+    for export_format in _parse_export_formats(export_formats):
+        if export_format == "html":
+            from pp_doclayout.exporters.html import HTMLExporter
+
+            exporter = HTMLExporter()
+        else:
+            from pp_doclayout.exporters.pdf import PDFExporter
+
+            exporter = PDFExporter()
+
+        output_path = (
+            project_dir / f"{output_suffix}_{project_data['project_name']}.{export_format}"
+        )
+        exporter.export(project_data, output_path)
+        output_paths.append(output_path)
+        typer.echo(f"✓ {export_format.upper()} created: {output_path}")
+
+    return output_paths
 
 def _create_paddle_ocr_pipeline():
     """Create the PaddleOCR-VL pipeline with explicit device selection."""
@@ -100,14 +148,14 @@ def translate(
         "-s",
         help="Hậu tố tên file output (default: translated)",
     ),
-    export_format: str = typer.Option(
-        "html",
+    export_formats: str = typer.Option(
+        DEFAULT_EXPORT_FORMATS,
         "--format",
         "-f",
-        help="Định dạng export (default: html)",
+        help="Định dạng export, phân tách bằng dấu phẩy (default: html,pdf)",
     ),
 ):
-    """Dịch project đã parse sang HTML.
+    """Dịch project đã parse và export artifact đã chọn.
 
     Sử dụng Gemma model để dịch:
     - Abstract
@@ -139,18 +187,12 @@ def translate(
     project_data["pages"] = translated_pages
 
     # 4. Export
-    if export_format == "pdf":
-        from pp_doclayout.exporters.pdf import PDFExporter
-        exporter = PDFExporter()
-        ext = "pdf"
-    else:
-        from pp_doclayout.exporters.html import HTMLExporter
-        exporter = HTMLExporter()
-        ext = "html"
-    output_path = project_dir / f"{output_suffix}_{project_data['project_name']}.{ext}"
-    exporter.export(project_data, output_path)
-
-    typer.echo(f"✓ {ext.upper()} created: {output_path}")
+    _export_project(
+        project_data,
+        project_dir,
+        output_suffix,
+        export_formats,
+    )
 
 
 @app.command()
@@ -162,11 +204,11 @@ def run(
         "-s",
         help="Hậu tố tên file output (default: translated)",
     ),
-    export_format: str = typer.Option(
-        "html",
+    export_formats: str = typer.Option(
+        DEFAULT_EXPORT_FORMATS,
         "--format",
         "-f",
-        help="Định dạng export (default: html)",
+        help="Định dạng export, phân tách bằng dấu phẩy (default: html,pdf)",
     ),
 ):
     """Full pipeline: parse + translate.
@@ -226,18 +268,12 @@ def run(
     project_data["pages"] = translated_pages
 
     # 4. Export
-    if export_format == "pdf":
-        from pp_doclayout.exporters.pdf import PDFExporter
-        exporter = PDFExporter()
-        ext = "pdf"
-    else:
-        from pp_doclayout.exporters.html import HTMLExporter
-        exporter = HTMLExporter()
-        ext = "html"
-    output_path = project_dir / f"{output_suffix}_{project_data['project_name']}.{ext}"
-    exporter.export(project_data, output_path)
-
-    typer.echo(f"✓ {ext.upper()} created: {output_path}")
+    _export_project(
+        project_data,
+        project_dir,
+        output_suffix,
+        export_formats,
+    )
 
 def main():
     app()

@@ -79,17 +79,8 @@ uv run -m pp_doclayout.cli run paper.pdf
 
 If PaddlePaddle verification fails, fix Paddle/CUDA before running `parse` or `run`.
 
-Output: `output/paper/translated_paper.html`
-
-```bash
-# Export as PDF instead
-uv run -m pp_doclayout.cli run paper.pdf -f pdf
-
-# Or translate existing parsed data to PDF
-uv run -m pp_doclayout.cli translate output/paper -f pdf
-```
-
-Output: `output/paper/translated_paper.pdf`
+The default command exports both `output/paper/translated_paper.html` and
+`output/paper/translated_paper.pdf`.
 
 PDF export uses Playwright-managed Chromium by default. To use a
 system-installed browser instead, set a Playwright browser channel in `.env`:
@@ -100,6 +91,57 @@ PPDOCLAYOUT_PLAYWRIGHT_BROWSER_CHANNEL=chrome
 
 The PDF print stylesheet maps each parsed HTML page to one PDF page and removes
 screen-only margins and shadows during export.
+
+## Docker Demo Deployment
+
+Use Docker when demonstrating on another Linux machine, or on Windows through
+Docker Desktop with WSL2 and NVIDIA GPU support. Docker packages Python, CUDA
+runtime, vLLM, PaddleOCR, and Playwright; the target machine does not need a
+local `uv` environment.
+
+Before building, verify that Docker can access the host GPU:
+
+```bash
+nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04 nvidia-smi
+```
+
+Build the images, start the two model servers, wait for `healthy`, then run the
+pipeline. The first server start downloads model weights into a Docker volume.
+
+```bash
+docker compose build
+docker compose up -d paddle-ocr-vl translate-gemma
+docker compose ps
+docker compose run --rm pipeline run input/PhoMT.pdf
+```
+
+`input/` and `output/` remain on the host machine. To reduce simultaneous VRAM
+use, run the two stages separately and stop the first model before starting the
+second:
+
+```bash
+docker compose up -d paddle-ocr-vl
+docker compose run --rm --no-deps pipeline parse input/PhoMT.pdf
+docker compose stop paddle-ocr-vl
+
+docker compose up -d translate-gemma
+docker compose run --rm --no-deps pipeline translate output/PhoMT
+docker compose stop translate-gemma
+```
+
+Stop containers while retaining downloaded weights:
+
+```bash
+docker compose down
+```
+
+The current Docker configuration targets a modern NVIDIA GPU. It has been
+built and smoke-tested on the development machine; RTX 3060 12 GB needs a
+separate reduced-memory profile before it is a supported demo target. A typical
+8 GB RTX 4060 should be used for parsing/rendering or as a client to a remote
+translation server. Quadro P3200 is not supported by the current vLLM/CUDA
+stack. See [docker/README.md](docker/README.md) for the full deployment guide.
 
 ---
 
@@ -160,27 +202,27 @@ Output saved to `output/<filename>/`:
 Needs TranslateGemma server (port 8001).
 
 ```bash
-# HTML output (default)
+# HTML and PDF output (default)
 uv run -m pp_doclayout.cli translate output/<filename>
 
-# PDF output
+# Export only PDF
 uv run -m pp_doclayout.cli translate output/<filename> -f pdf
 
 # Custom output suffix
 uv run -m pp_doclayout.cli translate output/<filename> --suffix vi
 ```
 
-Output: `output/<filename>/translated_<filename>.html` or `.pdf`
+Output by default: `output/<filename>/translated_<filename>.html` and `.pdf`
 
 ### Full Pipeline
 
 Parse + translate in one command. Requires both servers running.
 
 ```bash
-# HTML output (default)
+# HTML and PDF output (default)
 uv run -m pp_doclayout.cli run <file.pdf>
 
-# PDF output
+# Export only PDF
 uv run -m pp_doclayout.cli run <file.pdf> -f pdf
 ```
 
@@ -198,7 +240,7 @@ The pipeline uses 2 models, each on a separate vLLM server:
 | Model | Size | Port | Purpose |
 |-------|------|------|---------|
 | **PaddleOCR-VL** | 0.9B | 8000 | Layout analysis, OCR, crop images |
-| **TranslateGemma** | 4B (bitsandbytes quantized) | 8001 | English → Vietnamese translation |
+| **TranslateGemma** | 4B (vLLM FP8 configuration) | 8001 | English → Vietnamese translation |
 
 ### Verify servers
 
@@ -212,8 +254,8 @@ curl http://127.0.0.1:8001/v1/models
 | Action | Labels | Description |
 |--------|--------|-------------|
 | **Translate** | `abstract`, `text`, `figure_title` | Main content |
-| **Keep** | `doc_title`, `paragraph_title`, `reference_content`, `footnote`, `display_formula`, `table`, `image`, `chart`, `formula_number` | Titles, references, formulas |
-| **Skip** | `aside_text`, `header`, `footer`, `number` | Noise, page numbers |
+| **Keep** | `doc_title`, `paragraph_title`, `reference_content`, `footnote`, `display_formula`, `table`, `image`, `chart`, `formula_number`, `number` | Titles, references, formulas, page numbers |
+| **Skip** | `aside_text`, `header`, `footer`, `content` | Noise blocks |
 
 ## Project Structure
 
