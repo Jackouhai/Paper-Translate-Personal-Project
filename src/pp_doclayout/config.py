@@ -50,6 +50,10 @@ class Settings(BaseSettings):
         default="http://127.0.0.1:8000/v1",
         description="URL for PaddleOCR-VL server"
     )
+    parse_api_base_url: str = Field(
+        default="http://127.0.0.1:8082",
+        description="URL for the long-lived local Parse API",
+    )
     paddle_ocr_backend: str = Field(
         default="vllm-server",
         description="Backend for PaddleOCR-VL (vllm-server or local)"

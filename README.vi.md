@@ -19,7 +19,8 @@ Pipeline dịch tài liệu học thuật PDF sang tiếng Việt, giữ nguyên
 
 > **Yêu cầu:** Linux | NVIDIA GPU | Python 3.10+ | [uv](https://docs.astral.sh/uv/)
 >
-> **VRAM:** ~4-8GB chạy từng bước, ~16GB cho full pipeline (cả 2 servers cùng lúc)
+> **VRAM:** ~4-8GB khi chạy từng bước. Docker mặc định chạy PP-DocLayoutV3 ở
+> CPU; cả ba service đã được startup test trên RTX 5060 Ti 16GB.
 
 ### PaddlePaddle Wheel
 
@@ -106,26 +107,26 @@ nvidia-smi
 docker run --rm --gpus all nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04 nvidia-smi
 ```
 
-Build image, khởi động hai model server, đợi trạng thái `healthy`, rồi chạy
+Build image, khởi động hai model server và Parse API, đợi trạng thái `healthy`, rồi chạy
 pipeline. Lần khởi động server đầu tiên sẽ tải model vào Docker volume.
 
 ```bash
 docker compose build
-docker compose up -d paddle-ocr-vl translate-gemma
+docker compose up -d paddle-ocr-vl translate-gemma parse-api
 docker compose ps
 docker compose run --rm pipeline run input/PhoMT.pdf
 ```
 
-`input/` và `output/` vẫn nằm trên máy host. Để giảm VRAM dùng đồng thời, chạy
+`input/` và `output/` vẫn nằm trên máy host. Với GPU 12GB trở xuống, hãy chạy
 từng bước và tắt model thứ nhất trước khi chạy model thứ hai:
 
 ```bash
-docker compose up -d paddle-ocr-vl
+docker compose up -d paddle-ocr-vl parse-api
 docker compose run --rm --no-deps pipeline parse input/PhoMT.pdf
-docker compose stop paddle-ocr-vl
+docker compose stop parse-api paddle-ocr-vl
 
 docker compose up -d translate-gemma
-docker compose run --rm --no-deps pipeline translate output/PhoMT
+docker compose run --rm --no-deps pipeline translate output/<thư_mục_parse>
 docker compose stop translate-gemma
 ```
 
@@ -150,7 +151,7 @@ trợ bởi stack vLLM/CUDA hiện tại. Xem hướng dẫn đầy đủ tại
 
 ### Khởi động model servers
 
-Mở hai terminal:
+Mở ba terminal:
 
 ```bash
 # Terminal 1: OCR/layout server
@@ -158,6 +159,9 @@ scripts/start_paddle_ocr_vl.sh
 
 # Terminal 2: translation server
 scripts/start_translate_gemma.sh
+
+# Terminal 3: DocLayout worker và Parse API chạy lâu dài
+scripts/start_parse_api.sh
 ```
 
 Sau đó kiểm tra cả hai endpoint model tương thích OpenAI:
@@ -165,11 +169,12 @@ Sau đó kiểm tra cả hai endpoint model tương thích OpenAI:
 ```bash
 curl http://127.0.0.1:8000/v1/models
 curl http://127.0.0.1:8001/v1/models
+curl http://127.0.0.1:8082/health
 ```
 
-CLI sẽ kiểm tra các endpoint này trước khi chạy `parse`, `translate`, hoặc
-`run`. Nếu thiếu server bắt buộc, command sẽ dừng sớm và in ra URL server cùng
-lý do lỗi.
+`parse` và `run` gửi bước parse sang Parse API. Nếu API chưa chạy, chúng sẽ báo
+lệnh `scripts/start_parse_api.sh`. `translate` vẫn kiểm tra trực tiếp server
+TranslateGemma.
 
 Mặc định, các model phụ local của PaddleOCR như `PP-DocLayoutV3` dùng:
 
@@ -181,9 +186,39 @@ PPDOCLAYOUT_PADDLE_OCR_CLIENT_DEVICE=auto
 dùng `cpu`. Có thể ép device bằng cách đặt giá trị này thành `cpu` hoặc `gpu:0`
 trong `.env`.
 
+### Parse API chạy lâu dài
+
+Khi có nhiều request parse, khởi động API một lần thay vì gọi CLI cho từng
+request. API chỉ nạp một lần model phụ local `PP-DocLayoutV3`, xếp các PDF theo
+hàng đợi FIFO, và giữ model trong VRAM đến khi API dừng.
+
+Bắt buộc dùng đúng một Uvicorn worker. Nhiều worker là nhiều process Python
+riêng, mỗi process sẽ nạp thêm một bản model layout local.
+
+```bash
+# PaddleOCR-VL server ở port 8000 phải đang chạy trước.
+scripts/start_parse_api.sh
+
+# Lệnh CLI tương đương
+uv run -m pp_doclayout.cli serve
+```
+
+Gửi PDF, sau đó polling theo `job_id` nhận được:
+
+```bash
+curl -F "file=@input/PhoMT.pdf" http://127.0.0.1:8082/parse
+curl http://127.0.0.1:8082/jobs/<job_id>
+```
+
+Trạng thái job là `queued`, `running`, `completed`, hoặc `failed`. Các lệnh CLI
+giữ nguyên cú pháp, nhưng output của `parse` được lưu tại
+`output/<tên_file>-<job-id>/`, do đó hai file cùng tên không ghi đè nhau. Không
+dùng `--reload` khi demo ổn định vì reload sẽ tạo lại model worker.
+
 ### Bước 1: Parse PDF
 
-Chỉ cần PaddleOCR-VL server (port 8000).
+Cần Parse API (port 8082); worker chạy lâu dài của API cần PaddleOCR-VL server
+(port 8000).
 
 ```bash
 uv run -m pp_doclayout.cli parse <file.pdf>
@@ -192,7 +227,7 @@ uv run -m pp_doclayout.cli parse <file.pdf>
 uv run -m pp_doclayout.cli parse <file.pdf> -o ./ket_qua
 ```
 
-Kết quả lưu tại `output/<tên_file>/`:
+Kết quả được lưu tại `output/<tên_file>-<job-id>/` (CLI sẽ in đúng đường dẫn):
 - `*_res.json` — parsing results (tọa độ + nội dung từng block)
 - `*_res.md` — markdown output
 - `imgs/` — cropped images
@@ -203,20 +238,21 @@ Cần TranslateGemma server (port 8001).
 
 ```bash
 # Xuất cả HTML và PDF (mặc định)
-uv run -m pp_doclayout.cli translate output/<tên_file>
+uv run -m pp_doclayout.cli translate output/<thư_mục_parse>
 
 # Chỉ xuất PDF
-uv run -m pp_doclayout.cli translate output/<tên_file> -f pdf
+uv run -m pp_doclayout.cli translate output/<thư_mục_parse> -f pdf
 
 # Hậu tố file tùy chỉnh
-uv run -m pp_doclayout.cli translate output/<tên_file> --suffix vi
+uv run -m pp_doclayout.cli translate output/<thư_mục_parse> --suffix vi
 ```
 
-Mặc định tạo: `output/<tên_file>/translated_<tên_file>.html` và `.pdf`
+Mặc định tạo: `<thư_mục_parse>/translated_<tên_file>.html` và `.pdf`
 
 ### Full Pipeline
 
-Chạy parse + translate trong 1 lệnh. Cần cả 2 servers chạy cùng lúc.
+Chạy parse + translate trong 1 lệnh. Cần Parse API và TranslateGemma; Parse API
+đến lượt nó cần PaddleOCR-VL.
 
 ```bash
 # Xuất cả HTML và PDF (mặc định)

@@ -53,18 +53,52 @@ services:
       start_period: 180s
     restart: unless-stopped
 
+  parse-api:
+    <<: *gpu-service
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.pipeline
+    command: ["serve", "--host", "0.0.0.0", "--port", "8082"]
+    depends_on:
+      paddle-ocr-vl:
+        condition: service_healthy
+    environment:
+      PPDOCLAYOUT_OUTPUT_DIR: output
+      PPDOCLAYOUT_PADDLE_OCR_SERVER_URL: http://paddle-ocr-vl:8000/v1
+      PPDOCLAYOUT_PADDLE_OCR_CLIENT_DEVICE: cpu
+      PPDOCLAYOUT_PADDLE_OCR_USE_CHART_RECOGNITION: "false"
+      HF_HOME: /models/huggingface
+    volumes:
+      - ./output:/app/output
+      - hf-cache:/models/huggingface
+      - paddlex-cache:/root/.paddlex
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"from urllib.request import urlopen; urlopen('http://127.0.0.1:8082/health', timeout=5)\"",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    restart: unless-stopped
+
   pipeline:
     <<: *gpu-service
     build:
       context: .
       dockerfile: docker/Dockerfile.pipeline
     depends_on:
+      parse-api:
+        condition: service_healthy
       paddle-ocr-vl:
         condition: service_healthy
       translate-gemma:
         condition: service_healthy
     environment:
       PPDOCLAYOUT_OUTPUT_DIR: output
+      PPDOCLAYOUT_PARSE_API_BASE_URL: http://parse-api:8082
       PPDOCLAYOUT_PADDLE_OCR_SERVER_URL: http://paddle-ocr-vl:8000/v1
       PPDOCLAYOUT_VLLM_BASE_URL: http://translate-gemma:8001/v1
       PPDOCLAYOUT_PADDLE_OCR_CLIENT_DEVICE: auto
@@ -80,3 +114,5 @@ services:
 volumes:
   hf-cache:
     name: pp-doclayout-hf-cache
+  paddlex-cache:
+    name: pp-doclayout-paddlex-cache
