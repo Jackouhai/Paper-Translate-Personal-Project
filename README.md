@@ -19,7 +19,8 @@ Academic PDF translation pipeline — English to Vietnamese, preserving original
 
 > **Requirements:** Linux | NVIDIA GPU | Python 3.10+ | [uv](https://docs.astral.sh/uv/)
 >
-> **VRAM:** ~4-8GB step-by-step, ~16GB for full pipeline (both servers at once)
+> **VRAM:** ~4-8GB step-by-step. Docker runs PP-DocLayoutV3 on CPU by default;
+> all three services have been startup-tested on an RTX 5060 Ti 16GB.
 
 ### PaddlePaddle Wheel
 
@@ -106,27 +107,27 @@ nvidia-smi
 docker run --rm --gpus all nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04 nvidia-smi
 ```
 
-Build the images, start the two model servers, wait for `healthy`, then run the
+Build the images, start the two model servers and Parse API, wait for `healthy`, then run the
 pipeline. The first server start downloads model weights into a Docker volume.
 
 ```bash
 docker compose build
-docker compose up -d paddle-ocr-vl translate-gemma
+docker compose up -d paddle-ocr-vl translate-gemma parse-api
 docker compose ps
 docker compose run --rm pipeline run input/PhoMT.pdf
 ```
 
-`input/` and `output/` remain on the host machine. To reduce simultaneous VRAM
-use, run the two stages separately and stop the first model before starting the
+`input/` and `output/` remain on the host machine. On 12GB or less, run the two
+stages separately and stop the first model before starting the
 second:
 
 ```bash
-docker compose up -d paddle-ocr-vl
+docker compose up -d paddle-ocr-vl parse-api
 docker compose run --rm --no-deps pipeline parse input/PhoMT.pdf
-docker compose stop paddle-ocr-vl
+docker compose stop parse-api paddle-ocr-vl
 
 docker compose up -d translate-gemma
-docker compose run --rm --no-deps pipeline translate output/PhoMT
+docker compose run --rm --no-deps pipeline translate output/<parse-output-dir>
 docker compose stop translate-gemma
 ```
 
@@ -151,7 +152,7 @@ stack. See [docker/README.md](docker/README.md) for the full deployment guide.
 
 ### Start model servers
 
-Open two terminals:
+Open three terminals:
 
 ```bash
 # Terminal 1: OCR/layout server
@@ -159,6 +160,9 @@ scripts/start_paddle_ocr_vl.sh
 
 # Terminal 2: translation server
 scripts/start_translate_gemma.sh
+
+# Terminal 3: persistent DocLayout worker and Parse API
+scripts/start_parse_api.sh
 ```
 
 Then verify both OpenAI-compatible model endpoints:
@@ -166,11 +170,12 @@ Then verify both OpenAI-compatible model endpoints:
 ```bash
 curl http://127.0.0.1:8000/v1/models
 curl http://127.0.0.1:8001/v1/models
+curl http://127.0.0.1:8082/health
 ```
 
-The CLI checks these endpoints before running `parse`, `translate`, or `run`.
-If a required server is missing, the command exits early with the server URL
-and failure reason.
+`parse` and `run` submit their parse stage to the Parse API. If it is missing,
+they exit with a command to start `scripts/start_parse_api.sh`. `translate`
+still checks its TranslateGemma server directly.
 
 By default, local PaddleOCR helper models such as `PP-DocLayoutV3` use:
 
@@ -181,9 +186,40 @@ PPDOCLAYOUT_PADDLE_OCR_CLIENT_DEVICE=auto
 `auto` selects `gpu:0` when Paddle detects a usable CUDA GPU, otherwise `cpu`.
 You can force a device by setting this value to `cpu` or `gpu:0` in `.env`.
 
+### Long-lived Parse API
+
+For multiple parse requests, start the API once instead of invoking the CLI
+per request. It loads the local `PP-DocLayoutV3` helper model once, queues PDF
+jobs in FIFO order, and keeps that model in VRAM until the API stops.
+
+Only use one Uvicorn worker. Multiple Uvicorn workers are separate Python
+processes and each would load another copy of the local layout model.
+
+```bash
+# PaddleOCR-VL server on port 8000 must already be running.
+scripts/start_parse_api.sh
+
+# Equivalent CLI command
+uv run -m pp_doclayout.cli serve
+```
+
+Submit a PDF, then poll its job ID:
+
+```bash
+curl -F "file=@input/PhoMT.pdf" http://127.0.0.1:8082/parse
+curl http://127.0.0.1:8082/jobs/<job_id>
+```
+
+The API returns `queued`, `running`, `completed`, or `failed`. Existing CLI
+commands keep their syntax, but `parse` output is now placed under
+`output/<filename>-<job-id>/` so concurrent uploads with the same filename
+cannot overwrite each other. Do not use `--reload` for a stable demo because a
+reload recreates the model worker.
+
 ### Step 1: Parse PDF
 
-Only needs PaddleOCR-VL server (port 8000).
+Needs the Parse API (port 8082), whose long-lived worker requires
+PaddleOCR-VL server (port 8000).
 
 ```bash
 uv run -m pp_doclayout.cli parse <file.pdf>
@@ -192,7 +228,8 @@ uv run -m pp_doclayout.cli parse <file.pdf>
 uv run -m pp_doclayout.cli parse <file.pdf> -o ./output
 ```
 
-Output saved to `output/<filename>/`:
+Output is saved to `output/<filename>-<job-id>/` (the CLI prints the exact
+path):
 - `*_res.json` — parsing results (coordinates + content per block)
 - `*_res.md` — markdown output
 - `imgs/` — cropped images
@@ -203,20 +240,21 @@ Needs TranslateGemma server (port 8001).
 
 ```bash
 # HTML and PDF output (default)
-uv run -m pp_doclayout.cli translate output/<filename>
+uv run -m pp_doclayout.cli translate output/<parse-output-dir>
 
 # Export only PDF
-uv run -m pp_doclayout.cli translate output/<filename> -f pdf
+uv run -m pp_doclayout.cli translate output/<parse-output-dir> -f pdf
 
 # Custom output suffix
-uv run -m pp_doclayout.cli translate output/<filename> --suffix vi
+uv run -m pp_doclayout.cli translate output/<parse-output-dir> --suffix vi
 ```
 
-Output by default: `output/<filename>/translated_<filename>.html` and `.pdf`
+Output by default: `<parse-output-dir>/translated_<filename>.html` and `.pdf`
 
 ### Full Pipeline
 
-Parse + translate in one command. Requires both servers running.
+Parse + translate in one command. Requires Parse API and TranslateGemma; the
+Parse API itself requires PaddleOCR-VL.
 
 ```bash
 # HTML and PDF output (default)
