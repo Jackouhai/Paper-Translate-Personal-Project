@@ -56,6 +56,31 @@ compose() {
     docker compose --env-file "${ENV_FILE}" "$@"
 }
 
+wait_for_service_health() {
+    local name="$1"
+    local service="$2"
+    local started_at
+    local container_id
+    local status
+    started_at="$(date +%s)"
+
+    until container_id="$(compose ps -q "${service}")" \
+        && [[ -n "${container_id}" ]] \
+        && status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${container_id}" 2>/dev/null)" \
+        && [[ "${status}" == "healthy" ]]; do
+        if (( $(date +%s) - started_at >= HEALTH_TIMEOUT_SECONDS )); then
+            echo "error: ${name} did not become ready within ${HEALTH_TIMEOUT_SECONDS}s" >&2
+            compose logs --tail=120 "${service}" >&2 || true
+            exit 1
+        fi
+
+        echo "waiting for ${name}..."
+        sleep 10
+    done
+
+    echo "${name} is ready"
+}
+
 wait_for_endpoint() {
     local name="$1"
     local endpoint="$2"
@@ -84,17 +109,17 @@ fi
 
 echo "==> Starting TranslateGemma"
 compose up -d translate-gemma
-wait_for_endpoint "TranslateGemma" "http://127.0.0.1:8001/v1/models" "translate-gemma"
+wait_for_service_health "TranslateGemma" "translate-gemma"
 
 echo "==> Starting PaddleOCR-VL"
 compose up -d paddle-ocr-vl
-wait_for_endpoint "PaddleOCR-VL" "http://127.0.0.1:8000/v1/models" "paddle-ocr-vl"
+wait_for_service_health "PaddleOCR-VL" "paddle-ocr-vl"
 
 echo "==> Starting Parse API and browser demo"
 compose up -d parse-api
-wait_for_endpoint "Parse API" "http://127.0.0.1:8082/health" "parse-api"
+wait_for_service_health "Parse API" "parse-api"
 compose up -d web-api web-frontend
-wait_for_endpoint "Web API" "http://127.0.0.1:8083/health" "web-api"
+wait_for_service_health "Web API" "web-api"
 wait_for_endpoint "Web frontend" "http://127.0.0.1:3000" "web-frontend"
 
 if (( START_TUNNEL )); then
