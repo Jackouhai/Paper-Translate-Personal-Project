@@ -13,10 +13,11 @@ usage() {
 Usage: scripts/start_vps_demo.sh [--skip-build] [--no-tunnel]
 
 Starts the 12 GB VPS demo in this order:
-  1. TranslateGemma
-  2. PaddleOCR-VL
-  3. Parse API, web API, and frontend
-  4. Cloudflare Quick Tunnel (unless --no-tunnel is supplied)
+  1. Verify Docker can access the NVIDIA GPU
+  2. TranslateGemma
+  3. PaddleOCR-VL
+  4. Parse API, web API, and frontend
+  5. Cloudflare Quick Tunnel (unless --no-tunnel is supplied)
 
 The script copies .env.vps.example to .env.vps on its first run.
 EOF
@@ -54,6 +55,19 @@ fi
 
 compose() {
     docker compose --env-file "${ENV_FILE}" "$@"
+}
+
+check_docker_gpu() {
+    echo "==> Verifying Docker GPU access"
+    if ! docker run --rm --gpus all \
+        nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04 nvidia-smi; then
+        cat >&2 <<'EOF'
+error: Docker cannot access the NVIDIA GPU.
+Check host `nvidia-smi`, then verify NVIDIA Container Toolkit and Docker runtime
+configuration before starting model containers.
+EOF
+        exit 1
+    fi
 }
 
 wait_for_service_health() {
@@ -101,6 +115,8 @@ wait_for_endpoint() {
 
     echo "${name} is ready"
 }
+
+check_docker_gpu
 
 if (( BUILD_IMAGES )); then
     echo "==> Building Docker images"

@@ -42,7 +42,8 @@ docker compose --env-file .env.vps up -d paddle-ocr-vl translate-gemma parse-api
 
 For the normal demo startup, use the sequential launcher instead. It waits for
 TranslateGemma before loading PaddleOCR-VL, then starts the remaining services
-and prints the temporary Cloudflare URL:
+and prints the temporary Cloudflare URL. Before loading either model, it runs
+`nvidia-smi` in a CUDA container to verify Docker GPU pass-through:
 
 ```bash
 chmod +x scripts/start_vps_demo.sh
