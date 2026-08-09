@@ -14,13 +14,15 @@ Academic PDF translation pipeline — English to Vietnamese, preserving original
 - **Smart Policy** — preserve titles, references, formulas; only translate main content
 - **HTML Output** — absolute positioning, MathJax formula rendering
 - **PDF Export** — headless Chrome rendering via Playwright
+- **Browser Demo** — upload, processing status, and side-by-side PDF review
 
 ## Quick Start
 
 > **Requirements:** Linux | NVIDIA GPU | Python 3.10+ | [uv](https://docs.astral.sh/uv/)
 >
-> **VRAM:** ~4-8GB step-by-step. Docker runs PP-DocLayoutV3 on CPU by default;
-> all three services have been startup-tested on an RTX 5060 Ti 16GB.
+> **VRAM:** ~4-8GB step-by-step. The local Docker profile lets PP-DocLayoutV3
+> use `gpu:0` when Paddle detects CUDA. The VPS profile keeps it on CPU to
+> reserve VRAM for the two vLLM servers.
 
 ### PaddlePaddle Wheel
 
@@ -136,6 +138,36 @@ Stop containers while retaining downloaded weights:
 ```bash
 docker compose down
 ```
+
+### Browser demo
+
+Start the one-page review interface at <http://localhost:3000>:
+
+```bash
+docker compose up -d paddle-ocr-vl translate-gemma parse-api web-api web-frontend
+```
+
+The left column uploads a PDF and selects all pages or one page. The source PDF
+appears in the middle immediately; after translation, the translated PDF is
+shown in the right column. The shared zoom control applies to both documents.
+
+The parse stage is serialized to keep the DocLayout model stable. Locally, up
+to five completed parse jobs can enter translation concurrently; each job sends
+up to four requests to the TranslateGemma server. Set
+`WEB_DEMO_TRANSLATION_WORKERS` and `WEB_DEMO_MAX_CONCURRENT_REQUESTS` in the
+Compose environment to tune those limits. The supplied VPS profile uses one
+translation worker.
+
+For a short public demonstration, start the optional Cloudflare Quick Tunnel:
+
+```bash
+docker compose --profile tunnel up -d cloudflared
+docker compose logs -f cloudflared
+```
+
+Share the `https://...trycloudflare.com` URL printed in the logs. It changes
+when the tunnel restarts and is public, so stop it when the presentation ends.
+See [docker/README.md](docker/README.md) for the complete deployment guide.
 
 The current Docker configuration targets a modern NVIDIA GPU. It has been
 built and smoke-tested on the development machine; RTX 3060 12 GB needs a

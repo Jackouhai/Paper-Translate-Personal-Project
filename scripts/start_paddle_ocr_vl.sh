@@ -16,10 +16,10 @@ exec uv run vllm serve PaddlePaddle/PaddleOCR-VL-1.6 \
     --served-model-name PaddleOCR-VL-1.5-0.9B \
     --trust-remote-code \
     --dtype bfloat16 \
-    --max-model-len 8192 \
-    --max-num-seqs 30 \
-    --max-num-batched-tokens 8192 \
-    --gpu-memory-utilization 0.16 \
+    --max-model-len "${PADDLE_OCR_VL_MAX_MODEL_LEN:-8192}" \
+    --max-num-seqs "${PADDLE_OCR_VL_MAX_NUM_SEQS:-30}" \
+    --max-num-batched-tokens "${PADDLE_OCR_VL_MAX_BATCHED_TOKENS:-8192}" \
+    --gpu-memory-utilization "${PADDLE_OCR_VL_GPU_MEMORY_UTILIZATION:-0.16}" \
     --no-enable-prefix-caching \
     --mm-processor-cache-gb 0 \
     --port 8000

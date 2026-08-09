@@ -7,6 +7,7 @@ from pp_doclayout.config import settings
 from pp_doclayout.core.parse_api_client import ParseAPIError, parse_pdf_via_api
 from pp_doclayout.utils.paddle_device import resolve_paddle_device
 from pp_doclayout.utils.server_health import check_server_health
+from pp_doclayout.core.workflow import translate_and_export_project
 
 app = typer.Typer(
     name="ppdoc",
@@ -43,7 +44,6 @@ def _export_project(
     export_formats: str,
 ) -> list[Path]:
     output_paths = []
-
     for export_format in _parse_export_formats(export_formats):
         if export_format == "html":
             from pp_doclayout.exporters.html import HTMLExporter
@@ -59,8 +59,8 @@ def _export_project(
         )
         exporter.export(project_data, output_path)
         output_paths.append(output_path)
-        typer.echo(f"✓ {export_format.upper()} created: {output_path}")
-
+    for output_path in output_paths:
+        typer.echo(f"✓ {output_path.suffix[1:].upper()} created: {output_path}")
     return output_paths
 
 def _create_paddle_ocr_pipeline():
@@ -158,37 +158,19 @@ def translate(
     - Nội dung text chính
     - Figure/table captions
     """
-    from pp_doclayout.core.renderer import build_project_data, translate_page_data, render_page_blocks
-
     # Check the translation server before creating the translator.
     _require_server("TranslateGemma", settings.vllm_base_url)
     translator = get_gemma()
 
-    # 1. Build project data from JSON files
     project_dir = Path(project_dir)
-    project_data = build_project_data(project_dir)
-
-    # 2. Translate all pages
-    translated_pages = []
-    for page in project_data["pages"]:
-        translated_page = translate_page_data(page, translator)
-
-        # 3. Render page blocks to HTML
-        imgs_dir = project_dir / "imgs"
-        blocks_html = render_page_blocks(translated_page, imgs_dir, project_dir)
-        translated_page["html_content"] = blocks_html
-
-        translated_pages.append(translated_page)
-
-    project_data["pages"] = translated_pages
-
-    # 4. Export
-    _export_project(
-        project_data,
+    output_paths = translate_and_export_project(
         project_dir,
-        output_suffix,
-        export_formats,
+        translator,
+        output_suffix=output_suffix,
+        export_formats=_parse_export_formats(export_formats),
     )
+    for output_path in output_paths:
+        typer.echo(f"✓ {output_path.suffix[1:].upper()} created: {output_path}")
 
 
 @app.command()
@@ -228,33 +210,15 @@ def run(
 
     # Step 2: Translate
     typer.echo("\n=== Step 2: Translate ===")
-    from pp_doclayout.core.renderer import build_project_data, translate_page_data, render_page_blocks
     translator = get_gemma()
-
-    # 1. Build project data from JSON files
-    project_data = build_project_data(project_dir)
-
-    # 2. Translate all pages
-    translated_pages = []
-    for page in project_data["pages"]:
-        translated_page = translate_page_data(page, translator)
-
-        # 3. Render page blocks to HTML
-        imgs_dir = project_dir / "imgs"
-        blocks_html = render_page_blocks(translated_page, imgs_dir, project_dir)
-        translated_page["html_content"] = blocks_html
-
-        translated_pages.append(translated_page)
-
-    project_data["pages"] = translated_pages
-
-    # 4. Export
-    _export_project(
-        project_data,
+    output_paths = translate_and_export_project(
         project_dir,
-        output_suffix,
-        export_formats,
+        translator,
+        output_suffix=output_suffix,
+        export_formats=_parse_export_formats(export_formats),
     )
+    for output_path in output_paths:
+        typer.echo(f"✓ {output_path.suffix[1:].upper()} created: {output_path}")
 
 
 @app.command()

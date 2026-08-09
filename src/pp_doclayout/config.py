@@ -104,7 +104,20 @@ class Settings(BaseSettings):
     output_dir: str = Field(
         default="output",
         description="Base output directory"
-    )   
+    )
+    web_demo_max_upload_bytes: int = Field(
+        default=100 * 1024 * 1024,
+        description="Maximum PDF upload size accepted by the browser demo API",
+    )
+    web_demo_max_queued_jobs: int = Field(
+        default=1,
+        description="Maximum browser-demo jobs allowed to wait behind the active job",
+    )
+    web_demo_translation_workers: int = Field(
+        default=1,
+        ge=1,
+        description="Number of browser-demo translation workers after parsing.",
+    )
 
     playwright_browser_channel: str | None = Field(
         default=None,
