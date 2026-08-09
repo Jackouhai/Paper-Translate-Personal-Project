@@ -15,6 +15,15 @@ services:
       - "8001:8001"
     environment:
       HF_HOME: /models/huggingface
+      TRANSLATE_GEMMA_QUANTIZATION: ${TRANSLATE_GEMMA_QUANTIZATION:-fp8}
+      TRANSLATE_GEMMA_DTYPE: ${TRANSLATE_GEMMA_DTYPE:-auto}
+      TRANSLATE_GEMMA_KV_CACHE_DTYPE: ${TRANSLATE_GEMMA_KV_CACHE_DTYPE:-fp8}
+      TRANSLATE_GEMMA_MAX_MODEL_LEN: ${TRANSLATE_GEMMA_MAX_MODEL_LEN:-4096}
+      TRANSLATE_GEMMA_MAX_NUM_SEQS: ${TRANSLATE_GEMMA_MAX_NUM_SEQS:-24}
+      TRANSLATE_GEMMA_MAX_BATCHED_TOKENS: ${TRANSLATE_GEMMA_MAX_BATCHED_TOKENS:-16384}
+      TRANSLATE_GEMMA_GPU_MEMORY_UTILIZATION: ${TRANSLATE_GEMMA_GPU_MEMORY_UTILIZATION:-0.8}
+      TRANSLATE_GEMMA_ENFORCE_EAGER: ${TRANSLATE_GEMMA_ENFORCE_EAGER:-0}
+      TRANSLATE_GEMMA_CPU_OFFLOAD_GB: ${TRANSLATE_GEMMA_CPU_OFFLOAD_GB:-0}
     volumes:
       - hf-cache:/models/huggingface
     healthcheck:
@@ -39,6 +48,10 @@ services:
       - "8000:8000"
     environment:
       HF_HOME: /models/huggingface
+      PADDLE_OCR_VL_MAX_MODEL_LEN: ${PADDLE_OCR_VL_MAX_MODEL_LEN:-8192}
+      PADDLE_OCR_VL_MAX_NUM_SEQS: ${PADDLE_OCR_VL_MAX_NUM_SEQS:-30}
+      PADDLE_OCR_VL_MAX_BATCHED_TOKENS: ${PADDLE_OCR_VL_MAX_BATCHED_TOKENS:-8192}
+      PADDLE_OCR_VL_GPU_MEMORY_UTILIZATION: ${PADDLE_OCR_VL_GPU_MEMORY_UTILIZATION:-0.16}
     volumes:
       - hf-cache:/models/huggingface
     healthcheck:
@@ -65,7 +78,7 @@ services:
     environment:
       PPDOCLAYOUT_OUTPUT_DIR: output
       PPDOCLAYOUT_PADDLE_OCR_SERVER_URL: http://paddle-ocr-vl:8000/v1
-      PPDOCLAYOUT_PADDLE_OCR_CLIENT_DEVICE: cpu
+      PPDOCLAYOUT_PADDLE_OCR_CLIENT_DEVICE: ${PARSE_API_DEVICE:-auto}
       PPDOCLAYOUT_PADDLE_OCR_USE_CHART_RECOGNITION: "false"
       HF_HOME: /models/huggingface
     volumes:
@@ -110,6 +123,61 @@ services:
       - ./output:/app/output
       - hf-cache:/models/huggingface
     command: ["--help"]
+
+  web-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.pipeline
+    entrypoint: ["/app/.venv/bin/uvicorn", "pp_doclayout.demo_api:app"]
+    command: ["--host", "0.0.0.0", "--port", "8083"]
+    depends_on:
+      parse-api:
+        condition: service_healthy
+      translate-gemma:
+        condition: service_healthy
+    environment:
+      PPDOCLAYOUT_OUTPUT_DIR: output
+      PPDOCLAYOUT_PARSE_API_BASE_URL: http://parse-api:8082
+      PPDOCLAYOUT_VLLM_BASE_URL: http://translate-gemma:8001/v1
+      PPDOCLAYOUT_WEB_DEMO_MAX_QUEUED_JOBS: "10"
+      PPDOCLAYOUT_WEB_DEMO_TRANSLATION_WORKERS: ${WEB_DEMO_TRANSLATION_WORKERS:-5}
+      PPDOCLAYOUT_MAX_CONCURRENT_REQUESTS: ${WEB_DEMO_MAX_CONCURRENT_REQUESTS:-4}
+      HF_HOME: /models/huggingface
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+    volumes:
+      - ./output:/app/output
+      - hf-cache:/models/huggingface
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"from urllib.request import urlopen; urlopen('http://127.0.0.1:8083/health', timeout=5)\"",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  web-frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    depends_on:
+      web-api:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    command: ["tunnel", "--no-autoupdate", "--url", "http://web-frontend:80"]
+    depends_on:
+      web-frontend:
+        condition: service_started
+    restart: unless-stopped
 
 volumes:
   hf-cache:

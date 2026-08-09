@@ -14,13 +14,15 @@ Pipeline dịch tài liệu học thuật PDF sang tiếng Việt, giữ nguyên
 - **Translation Policy** — giữ nguyên tiêu đề, references, công thức, chỉ dịch nội dung chính
 - **HTML Output** — absolute positioning, MathJax render công thức
 - **PDF Export** — xuất PDF qua headless Chrome (Playwright)
+- **Browser Demo** — upload, theo dõi xử lý, và so sánh PDF song song
 
 ## Quick Start
 
 > **Yêu cầu:** Linux | NVIDIA GPU | Python 3.10+ | [uv](https://docs.astral.sh/uv/)
 >
-> **VRAM:** ~4-8GB khi chạy từng bước. Docker mặc định chạy PP-DocLayoutV3 ở
-> CPU; cả ba service đã được startup test trên RTX 5060 Ti 16GB.
+> **VRAM:** ~4-8GB khi chạy từng bước. Docker profile local cho phép
+> PP-DocLayoutV3 dùng `gpu:0` khi Paddle nhận CUDA. Profile VPS giữ model này ở
+> CPU để dành VRAM cho hai vLLM server.
 
 ### PaddlePaddle Wheel
 
@@ -135,6 +137,35 @@ Dừng container nhưng giữ cache model đã tải:
 ```bash
 docker compose down
 ```
+
+### Browser demo
+
+Khởi động giao diện xem lại một trang tại <http://localhost:3000>:
+
+```bash
+docker compose up -d paddle-ocr-vl translate-gemma parse-api web-api web-frontend
+```
+
+Cột trái dùng để upload PDF và chọn toàn bộ tài liệu hoặc một trang. PDF gốc
+hiện ngay ở cột giữa; sau khi dịch xong, PDF dịch hiện ở cột phải. Điều khiển
+zoom dùng chung cho cả hai tài liệu.
+
+Bước parse chạy tuần tự để model DocLayout ổn định. Trên cấu hình local, tối
+đa năm job parse xong có thể vào bước dịch đồng thời; mỗi job gửi tối đa bốn
+request đến TranslateGemma. Có thể chỉnh `WEB_DEMO_TRANSLATION_WORKERS` và
+`WEB_DEMO_MAX_CONCURRENT_REQUESTS` trong môi trường Compose. Profile VPS đi
+kèm chỉ dùng một translation worker.
+
+Để mở demo công khai trong thời gian ngắn, khởi động Cloudflare Quick Tunnel:
+
+```bash
+docker compose --profile tunnel up -d cloudflared
+docker compose logs -f cloudflared
+```
+
+Chia sẻ URL `https://...trycloudflare.com` in trong log. URL thay đổi khi tunnel
+khởi động lại và có thể truy cập công khai, nên hãy tắt tunnel sau phần demo.
+Xem [docker/README.md](docker/README.md) để có hướng dẫn triển khai đầy đủ.
 
 Cấu hình Docker hiện tại dành cho NVIDIA GPU đời mới. Image đã được build và
 smoke-test trên máy phát triển; RTX 3060 12 GB cần profile giảm bộ nhớ riêng

@@ -22,9 +22,10 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
+RUN uv run --no-sync playwright install --with-deps chromium
+
 COPY src ./src
 COPY scripts ./scripts
-RUN uv run --no-sync playwright install --with-deps chromium
 
 ENV UV_NO_SYNC=1 \
     HF_HOME=/models/huggingface \

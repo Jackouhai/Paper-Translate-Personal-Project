@@ -13,16 +13,37 @@ Native Windows containers are not supported.
   WSL2 GPU support on Windows.
 - At least the VRAM required by the current local configuration. The defaults
   match `scripts/start_paddle_ocr_vl.sh` and `scripts/start_translate_gemma.sh`.
-- The default Parse API runs PP-DocLayoutV3 on CPU to preserve GPU memory.
-  All three services have been startup-tested on an RTX 5060 Ti 16 GB. Run a
-  representative PDF before a live demo; use the staged workflow below on
-  12 GB GPUs or lower.
+- The local Docker profile uses `PARSE_API_DEVICE=auto`, so PP-DocLayoutV3 uses
+  `gpu:0` when Paddle detects CUDA. The supplied 12 GB VPS profile sets it to
+  `cpu` to preserve VRAM for the model servers. Run a representative PDF before
+  a live demo; use the staged workflow below on 12 GB GPUs or lower.
 
 Verify GPU pass-through before building the project:
 
 ```bash
 docker run --rm --gpus all nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04 nvidia-smi
 ```
+
+## RTX 3060 12 GB VPS profile
+
+The default model profile targets the development GPU. For an RTX 3060 12 GB
+VPS, create an untracked profile file from the supplied template:
+
+```bash
+cp .env.vps.example .env.vps
+```
+
+Use that file with every Docker Compose command on the VPS:
+
+```bash
+docker compose --env-file .env.vps build
+docker compose --env-file .env.vps up -d paddle-ocr-vl translate-gemma parse-api web-api web-frontend
+```
+
+The profile switches TranslateGemma to 4-bit BitsAndBytes, disables CUDA Graph
+capture, lowers batch limits, and leaves VRAM headroom for PaddleOCR-VL. If
+TranslateGemma still cannot start, change `TRANSLATE_GEMMA_CPU_OFFLOAD_GB=1` in
+`.env.vps`; this shifts 1 GB of weights to system RAM and reduces throughput.
 
 ## Start and run
 
@@ -79,6 +100,54 @@ Stop the model servers without deleting downloaded weights:
 ```bash
 docker compose down
 ```
+
+## Browser demo and Cloudflare Quick Tunnel
+
+The browser demo is a single three-column workspace. The left column uploads a
+PDF and selects all pages or one page; the original PDF appears in the middle
+as soon as the upload is accepted; the translated PDF appears in the right
+column when the job completes. One shared zoom control applies to both PDF
+viewers.
+
+The parse stage is intentionally serialized. The local profile allows five
+completed parse jobs to translate concurrently, with up to four block requests
+per job sent to TranslateGemma. This is job-level concurrency; vLLM remains one
+model server and batches the requests continuously. The queue accepts ten jobs.
+For a 12 GB VPS, `.env.vps` reduces translation to one job at a time.
+
+Override the local limits only after measuring GPU headroom:
+
+```bash
+WEB_DEMO_TRANSLATION_WORKERS=3 WEB_DEMO_MAX_CONCURRENT_REQUESTS=3 \
+  docker compose up -d web-api
+```
+
+Start the complete demo locally at <http://localhost:3000>:
+
+```bash
+docker compose up -d paddle-ocr-vl translate-gemma parse-api web-api web-frontend
+docker compose ps
+```
+
+To expose only that frontend for a short presentation, include the optional
+Cloudflare Quick Tunnel profile:
+
+```bash
+docker compose --profile tunnel up -d
+docker compose logs -f cloudflared
+```
+
+Copy the `https://...trycloudflare.com` URL printed by `cloudflared` and share
+it with the council. The URL changes after the tunnel restarts. Quick Tunnel is
+public and does not support Cloudflare Access, so do not publish it outside the
+presentation and stop the stack when the session ends:
+
+```bash
+docker compose down
+```
+
+The tunnel reaches `web-frontend` only. PaddleOCR-VL, TranslateGemma, Parse API
+and Web API remain internal to the Docker network from the tunnel's perspective.
 
 To remove the downloaded model cache as well:
 

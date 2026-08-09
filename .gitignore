@@ -9,6 +9,9 @@ wheels/
 # Virtual environments
 .venv
 .env
+.env.*
+!.env.example
+!.env.vps.example
 output/
 input/
 
@@ -21,3 +24,7 @@ AGENTS.md
 # Other untracked
 pdf/
 logs/
+
+# Frontend build dependencies
+frontend_demo/node_modules/
+frontend_demo/dist/

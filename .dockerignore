@@ -3,6 +3,7 @@
 .venv/
 services/llm-server/.venv/
 .env
+.env.*
 input/
 output/
 output.zip
@@ -12,3 +13,5 @@ __pycache__/
 .mypy_cache/
 frontend_project/node_modules/
 frontend_project/dist/
+frontend_demo/node_modules/
+frontend_demo/dist/
