@@ -40,6 +40,18 @@ docker compose --env-file .env.vps build
 docker compose --env-file .env.vps up -d paddle-ocr-vl translate-gemma parse-api web-api web-frontend
 ```
 
+For the normal demo startup, use the sequential launcher instead. It waits for
+TranslateGemma before loading PaddleOCR-VL, then starts the remaining services
+and prints the temporary Cloudflare URL:
+
+```bash
+chmod +x scripts/start_vps_demo.sh
+./scripts/start_vps_demo.sh
+```
+
+Use `./scripts/start_vps_demo.sh --skip-build` for later restarts, or add
+`--no-tunnel` to keep the demo private on the VPS.
+
 The profile switches TranslateGemma to 4-bit BitsAndBytes, disables CUDA Graph
 capture, lowers batch limits, and leaves VRAM headroom for PaddleOCR-VL. If
 TranslateGemma still cannot start, change `TRANSLATE_GEMMA_CPU_OFFLOAD_GB=1` in

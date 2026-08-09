@@ -165,6 +165,9 @@ docker compose --profile tunnel up -d cloudflared
 docker compose logs -f cloudflared
 ```
 
+On a 12 GB VPS, use `./scripts/start_vps_demo.sh` to build and start the same
+services sequentially, with TranslateGemma ready before PaddleOCR-VL loads.
+
 Share the `https://...trycloudflare.com` URL printed in the logs. It changes
 when the tunnel restarts and is public, so stop it when the presentation ends.
 See [docker/README.md](docker/README.md) for the complete deployment guide.

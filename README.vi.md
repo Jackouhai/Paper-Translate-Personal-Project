@@ -163,6 +163,9 @@ docker compose --profile tunnel up -d cloudflared
 docker compose logs -f cloudflared
 ```
 
+Trên VPS 12 GB, dùng `./scripts/start_vps_demo.sh` để build và khởi động các
+service theo thứ tự: TranslateGemma sẵn sàng trước khi PaddleOCR-VL được nạp.
+
 Chia sẻ URL `https://...trycloudflare.com` in trong log. URL thay đổi khi tunnel
 khởi động lại và có thể truy cập công khai, nên hãy tắt tunnel sau phần demo.
 Xem [docker/README.md](docker/README.md) để có hướng dẫn triển khai đầy đủ.
