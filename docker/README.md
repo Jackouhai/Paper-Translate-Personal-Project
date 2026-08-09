@@ -70,7 +70,8 @@ The Docker images configure `uv` with a five-minute HTTP read timeout, five
 retries, and four concurrent downloads. This avoids most failures when large
 CUDA dependency wheels are downloaded on a slower network. If a build still
 fails due to a transient network error, rerun the same build command; Docker
-reuses completed layers and `uv` retries the interrupted dependency step.
+uses a persistent BuildKit cache for `uv` downloads, so completed wheels do not
+need to be downloaded again after a failed dependency layer.
 
 On a GPU with 16 GB VRAM or higher, start both model servers and the Parse API.
 The first start downloads model weights into the named Docker volumes
