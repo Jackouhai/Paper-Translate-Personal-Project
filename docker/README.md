@@ -159,6 +159,15 @@ presentation and stop the stack when the session ends:
 docker compose down
 ```
 
+If the temporary URL does not resolve, restart only the tunnel. This obtains a
+new URL without stopping or reloading the GPU model containers:
+
+```bash
+docker compose --env-file .env.vps --profile tunnel stop cloudflared
+docker compose --env-file .env.vps --profile tunnel up -d cloudflared
+docker compose --env-file .env.vps logs -f cloudflared
+```
+
 The tunnel reaches `web-frontend` only. PaddleOCR-VL, TranslateGemma, Parse API
 and Web API remain internal to the Docker network from the tunnel's perspective.
 

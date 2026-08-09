@@ -170,6 +170,15 @@ Chia sẻ URL `https://...trycloudflare.com` in trong log. URL thay đổi khi t
 khởi động lại và có thể truy cập công khai, nên hãy tắt tunnel sau phần demo.
 Xem [docker/README.md](docker/README.md) để có hướng dẫn triển khai đầy đủ.
 
+Nếu Quick Tunnel URL không resolve được, chỉ restart `cloudflared` để lấy URL
+mới, không dừng hoặc nạp lại hai model GPU:
+
+```bash
+docker compose --env-file .env.vps --profile tunnel stop cloudflared
+docker compose --env-file .env.vps --profile tunnel up -d cloudflared
+docker compose --env-file .env.vps logs -f cloudflared
+```
+
 Cấu hình Docker hiện tại dành cho NVIDIA GPU đời mới. Image đã được build và
 smoke-test trên máy phát triển; RTX 3060 12 GB cần profile giảm bộ nhớ riêng
 trước khi được xem là máy demo hỗ trợ chính thức. RTX 4060 8 GB phù hợp parse,

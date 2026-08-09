@@ -172,6 +172,15 @@ Share the `https://...trycloudflare.com` URL printed in the logs. It changes
 when the tunnel restarts and is public, so stop it when the presentation ends.
 See [docker/README.md](docker/README.md) for the complete deployment guide.
 
+If a Quick Tunnel URL does not resolve, restart only `cloudflared` to receive a
+new URL without stopping or reloading either GPU model:
+
+```bash
+docker compose --env-file .env.vps --profile tunnel stop cloudflared
+docker compose --env-file .env.vps --profile tunnel up -d cloudflared
+docker compose --env-file .env.vps logs -f cloudflared
+```
+
 The current Docker configuration targets a modern NVIDIA GPU. It has been
 built and smoke-tested on the development machine; RTX 3060 12 GB needs a
 separate reduced-memory profile before it is a supported demo target. A typical
