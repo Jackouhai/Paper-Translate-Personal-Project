@@ -179,6 +179,21 @@ docker compose --env-file .env.vps --profile tunnel up -d cloudflared
 docker compose --env-file .env.vps logs -f cloudflared
 ```
 
+Nếu Docker báo `failed to set up container networking` kèm `network ... not
+found`, container tunnel đã dừng đang giữ network cũ bị xóa bởi một lần
+`docker compose down` trước đó. Chỉ tạo lại container này, không restart các
+service GPU:
+
+```bash
+# Docker profile local
+docker compose --profile tunnel rm -f cloudflared
+docker compose --profile tunnel up -d cloudflared
+
+# VPS profile
+docker compose --env-file .env.vps --profile tunnel rm -f cloudflared
+docker compose --env-file .env.vps --profile tunnel up -d cloudflared
+```
+
 Cấu hình Docker hiện tại dành cho NVIDIA GPU đời mới. Image đã được build và
 smoke-test trên máy phát triển; RTX 3060 12 GB cần profile giảm bộ nhớ riêng
 trước khi được xem là máy demo hỗ trợ chính thức. RTX 4060 8 GB phù hợp parse,

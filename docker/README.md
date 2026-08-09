@@ -168,6 +168,21 @@ docker compose --env-file .env.vps --profile tunnel up -d cloudflared
 docker compose --env-file .env.vps logs -f cloudflared
 ```
 
+If restarting only `cloudflared` reports `failed to set up container networking`
+with `network ... not found`, its stopped container still references a Docker
+network removed by an earlier `docker compose down`. Recreate only that
+container; GPU model containers stay running:
+
+```bash
+# Local Docker profile
+docker compose --profile tunnel rm -f cloudflared
+docker compose --profile tunnel up -d cloudflared
+
+# VPS profile
+docker compose --env-file .env.vps --profile tunnel rm -f cloudflared
+docker compose --env-file .env.vps --profile tunnel up -d cloudflared
+```
+
 The tunnel reaches `web-frontend` only. PaddleOCR-VL, TranslateGemma, Parse API
 and Web API remain internal to the Docker network from the tunnel's perspective.
 

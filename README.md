@@ -181,6 +181,21 @@ docker compose --env-file .env.vps --profile tunnel up -d cloudflared
 docker compose --env-file .env.vps logs -f cloudflared
 ```
 
+If Docker reports `failed to set up container networking` with `network ... not
+found`, the stopped tunnel container references a network removed by an earlier
+`docker compose down`. Recreate only that container; do not restart the GPU
+services:
+
+```bash
+# Local Docker profile
+docker compose --profile tunnel rm -f cloudflared
+docker compose --profile tunnel up -d cloudflared
+
+# VPS profile
+docker compose --env-file .env.vps --profile tunnel rm -f cloudflared
+docker compose --env-file .env.vps --profile tunnel up -d cloudflared
+```
+
 The current Docker configuration targets a modern NVIDIA GPU. It has been
 built and smoke-tested on the development machine; RTX 3060 12 GB needs a
 separate reduced-memory profile before it is a supported demo target. A typical
