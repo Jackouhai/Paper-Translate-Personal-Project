@@ -15,11 +15,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
-        curl \
-        git \
         libgomp1 \
         python3.10 \
         python3.10-venv \
+        build-essential \
+        python3.10-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.32 /uv /uvx /bin/
@@ -28,11 +28,6 @@ WORKDIR /app/services/llm-server
 COPY services/llm-server/pyproject.toml services/llm-server/uv.lock ./
 RUN --mount=type=cache,id=pp-doclayout-vllm-uv-cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
-
-# Triton JIT-compiles Python/CUDA helper code while vLLM profiles some models.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential python3.10-dev \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY scripts/start_paddle_ocr_vl.sh scripts/start_translate_gemma.sh ./scripts/

@@ -12,6 +12,7 @@ wheels/
 .env.*
 !.env.example
 !.env.vps.example
+!.env.24gb.example
 output/
 input/
 

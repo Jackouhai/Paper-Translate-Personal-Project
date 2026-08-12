@@ -7,12 +7,13 @@ x-gpu-service: &gpu-service
 services:
   translate-gemma:
     <<: *gpu-service
+    image: pp-doclayout-vllm:local
     build:
       context: .
       dockerfile: docker/Dockerfile.vllm
     command: ["bash", "scripts/start_translate_gemma.sh"]
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
     environment:
       HF_HOME: /models/huggingface
       TRANSLATE_GEMMA_QUANTIZATION: ${TRANSLATE_GEMMA_QUANTIZATION:-fp8}
@@ -40,12 +41,13 @@ services:
 
   paddle-ocr-vl:
     <<: *gpu-service
+    image: pp-doclayout-vllm:local
     build:
       context: .
       dockerfile: docker/Dockerfile.vllm
     command: ["bash", "scripts/start_paddle_ocr_vl.sh"]
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       HF_HOME: /models/huggingface
       PADDLE_OCR_VL_MAX_MODEL_LEN: ${PADDLE_OCR_VL_MAX_MODEL_LEN:-8192}
@@ -68,6 +70,7 @@ services:
 
   parse-api:
     <<: *gpu-service
+    image: pp-doclayout-pipeline:local
     build:
       context: .
       dockerfile: docker/Dockerfile.pipeline
@@ -100,6 +103,7 @@ services:
 
   pipeline:
     <<: *gpu-service
+    image: pp-doclayout-pipeline:local
     build:
       context: .
       dockerfile: docker/Dockerfile.pipeline
@@ -126,6 +130,7 @@ services:
     command: ["--help"]
 
   web-api:
+    image: pp-doclayout-pipeline:local
     build:
       context: .
       dockerfile: docker/Dockerfile.pipeline
@@ -168,7 +173,7 @@ services:
       web-api:
         condition: service_healthy
     ports:
-      - "3000:80"
+      - "${WEB_FRONTEND_HOST_IP:-0.0.0.0}:${WEB_FRONTEND_HOST_PORT:-3000}:80"
     restart: unless-stopped
 
   cloudflared:

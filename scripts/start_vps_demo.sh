@@ -4,35 +4,66 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 ENV_FILE="${PROJECT_ROOT}/.env.vps"
+USE_ENV_FILE=0
 BUILD_IMAGES=1
 START_TUNNEL=1
 HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS:-1200}"
+WEB_FRONTEND_HOST_PORT="${WEB_FRONTEND_HOST_PORT:-3000}"
 
 usage() {
     cat <<'EOF'
-Usage: scripts/start_vps_demo.sh [--skip-build] [--no-tunnel]
+Usage: scripts/start_vps_demo.sh [--local|--vps|--env-file FILE] [--skip-build] [--no-tunnel]
 
-Starts the 12 GB VPS demo in this order:
+Starts the demo in this order:
   1. Verify Docker can access the NVIDIA GPU
   2. TranslateGemma
   3. PaddleOCR-VL
   4. Parse API, web API, and frontend
   5. Cloudflare Quick Tunnel (unless --no-tunnel is supplied)
 
-The script copies .env.vps.example to .env.vps on its first run.
+By default, Compose uses the local .env file and compose.yaml defaults.
+Use --vps for the RTX 3060 12 GB profile, or --env-file FILE for another profile.
 EOF
 }
 
-for argument in "$@"; do
-    case "${argument}" in
-        --skip-build) BUILD_IMAGES=0 ;;
-        --no-tunnel) START_TUNNEL=0 ;;
+while (( $# > 0 )); do
+    case "$1" in
+        --local)
+            USE_ENV_FILE=0
+            shift
+            ;;
+        --vps)
+            ENV_FILE="${PROJECT_ROOT}/.env.vps"
+            USE_ENV_FILE=1
+            shift
+            ;;
+        --env-file)
+            if [[ $# -lt 2 ]]; then
+                echo "error: --env-file requires a path" >&2
+                usage >&2
+                exit 2
+            fi
+            ENV_FILE="$2"
+            if [[ "${ENV_FILE}" != /* ]]; then
+                ENV_FILE="${PROJECT_ROOT}/${ENV_FILE}"
+            fi
+            USE_ENV_FILE=1
+            shift 2
+            ;;
+        --skip-build)
+            BUILD_IMAGES=0
+            shift
+            ;;
+        --no-tunnel)
+            START_TUNNEL=0
+            shift
+            ;;
         --help|-h)
             usage
             exit 0
             ;;
         *)
-            echo "error: unknown option: ${argument}" >&2
+            echo "error: unknown option: $1" >&2
             usage >&2
             exit 2
             ;;
@@ -48,13 +79,17 @@ done
 
 cd "${PROJECT_ROOT}"
 
-if [[ ! -f "${ENV_FILE}" ]]; then
+if (( USE_ENV_FILE )) && [[ ! -f "${ENV_FILE}" ]]; then
     cp .env.vps.example "${ENV_FILE}"
-    echo "created .env.vps from .env.vps.example"
+    echo "created ${ENV_FILE} from .env.vps.example"
 fi
 
 compose() {
-    docker compose --env-file "${ENV_FILE}" "$@"
+    if (( USE_ENV_FILE )); then
+        docker compose --env-file "${ENV_FILE}" "$@"
+    else
+        docker compose "$@"
+    fi
 }
 
 check_docker_gpu() {
@@ -136,7 +171,7 @@ compose up -d parse-api
 wait_for_service_health "Parse API" "parse-api"
 compose up -d web-api web-frontend
 wait_for_service_health "Web API" "web-api"
-wait_for_endpoint "Web frontend" "http://127.0.0.1:3000" "web-frontend"
+wait_for_endpoint "Web frontend" "http://127.0.0.1:${WEB_FRONTEND_HOST_PORT}" "web-frontend"
 
 if (( START_TUNNEL )); then
     echo "==> Starting Cloudflare Quick Tunnel"
@@ -161,4 +196,8 @@ fi
 
 echo
 compose ps
-echo "Demo is running. Use 'docker compose --env-file .env.vps down' to stop it."
+if (( USE_ENV_FILE )); then
+    echo "Demo is running. Use 'docker compose --env-file ${ENV_FILE} down' to stop it."
+else
+    echo "Demo is running. Use 'docker compose down' to stop it."
+fi

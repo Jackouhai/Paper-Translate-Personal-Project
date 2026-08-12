@@ -53,6 +53,25 @@ chmod +x scripts/start_vps_demo.sh
 Use `./scripts/start_vps_demo.sh --skip-build` for later restarts, or add
 `--no-tunnel` to keep the demo private on the VPS.
 
+For local development, use the dedicated wrapper. It uses the local `.env` and
+Compose defaults, binds the frontend to `127.0.0.1:3100`, and starts the tunnel
+unless `--no-tunnel` is supplied:
+
+```bash
+./scripts/start_local_demo.sh --skip-build
+```
+
+For a machine with about 24 GB VRAM, use the conservative 24 GB profile. The
+wrapper creates the untracked `.env.24gb` from its example on first use:
+
+```bash
+./scripts/start_24gb_demo.sh --skip-build
+```
+
+The 24 GB profile is an initial operating point, not a benchmark result. If
+the model logs show out-of-memory errors, lower `TRANSLATE_GEMMA_MAX_NUM_SEQS`
+or `PADDLE_OCR_VL_MAX_NUM_SEQS` in `.env.24gb` before increasing concurrency.
+
 The profile switches TranslateGemma to 4-bit BitsAndBytes, disables CUDA Graph
 capture, lowers batch limits, and leaves VRAM headroom for PaddleOCR-VL. If
 TranslateGemma still cannot start, change `TRANSLATE_GEMMA_CPU_OFFLOAD_GB=1` in

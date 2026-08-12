@@ -15,3 +15,4 @@ frontend_project/node_modules/
 frontend_project/dist/
 frontend_demo/node_modules/
 frontend_demo/dist/
+services/web-api/.venv/
