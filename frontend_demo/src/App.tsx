@@ -1,13 +1,17 @@
 import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
+  Check,
   CheckCircle2,
   Download,
+  FileCheck2,
   FileText,
+  Info,
   LoaderCircle,
   Minus,
   Plus,
   RotateCcw,
+  Sparkles,
   Upload,
   XCircle,
 } from "lucide-react";
@@ -21,6 +25,8 @@ pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 type JobStatus = "queued" | "parsing" | "translating" | "rendering" | "completed" | "failed";
 type Mode = "full" | "page";
 type PdfSource = File | string | null;
+type MobileView = "original" | "translated";
+type StepState = "complete" | "current" | "locked";
 
 interface Job {
   job_id: string;
@@ -61,6 +67,29 @@ function statusLabel(job: Job | null) {
   return "Dịch không hoàn tất";
 }
 
+function statusDescription(job: Job) {
+  if (job.status === "queued") return "Hệ thống sẽ bắt đầu xử lý tài liệu ngay.";
+  if (job.status === "parsing") return "Đang nhận diện cột, bảng, hình và công thức.";
+  if (job.status === "translating") return "Bản dịch đang được tạo và giữ lại bố cục gốc.";
+  if (job.status === "rendering") return "Đang ghép nội dung thành PDF để tải xuống.";
+  if (job.status === "completed") return "Bạn có thể xem trước hoặc tải bản PDF tiếng Việt.";
+  return "Có lỗi trong quá trình xử lý. Bạn có thể thử lại với tài liệu này.";
+}
+
+function statusProgress(job: Job) {
+  if (job.status === "queued") return 8;
+  if (job.status === "parsing") return 28;
+  if (job.status === "translating") return Math.min(82, 35 + (job.completed_pages / Math.max(job.total_pages, 1)) * 42);
+  if (job.status === "rendering") return 92;
+  return job.status === "completed" ? 100 : 0;
+}
+
+function stepState(step: number, file: File | null, job: Job | null): StepState {
+  if (step === 1) return file ? "complete" : "current";
+  if (step === 2) return !file ? "locked" : job ? "complete" : "current";
+  return job?.status === "completed" ? "complete" : job ? "current" : "locked";
+}
+
 function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -70,9 +99,11 @@ function App() {
   const [pageInput, setPageInput] = useState("1");
   const [scale, setScale] = useState(0.85);
   const [isReading, setIsReading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mobileView, setMobileView] = useState<MobileView>("original");
 
   const jobActive = Boolean(job && job.status !== "completed" && job.status !== "failed");
   const controlsLocked = jobActive;
@@ -103,20 +134,25 @@ function App() {
     if (!nextFile) return;
     if (nextFile.type !== "application/pdf" && !nextFile.name.toLowerCase().endsWith(".pdf")) {
       setFile(null);
+      setPageCount(0);
       setUploadError("Chỉ hỗ trợ tệp PDF.");
       return;
     }
 
     setIsReading(true);
+    setFile(null);
+    setPageCount(0);
     setJob(null);
     try {
-      setPageCount(await readPageCount(nextFile));
-    } catch {
-      setPageCount(0);
-    } finally {
+      const pages = await readPageCount(nextFile);
+      setPageCount(pages);
       setFile(nextFile);
       setPageNumber(1);
       setPageInput("1");
+      setMobileView("original");
+    } catch {
+      setUploadError("Không thể đọc tệp PDF này. Hãy kiểm tra tệp hoặc thử một bản PDF khác.");
+    } finally {
       setIsReading(false);
     }
   }
@@ -127,6 +163,7 @@ function App() {
 
   function onDrop(event: DragEvent<HTMLButtonElement>) {
     event.preventDefault();
+    setIsDragging(false);
     void selectFile(event.dataTransfer.files?.[0]);
   }
 
@@ -145,6 +182,7 @@ function App() {
       const payload = await response.json() as Job | { detail?: string };
       if (!response.ok) throw new Error("detail" in payload ? payload.detail : "Không thể tạo job dịch.");
       setJob(payload as Job);
+      setMobileView("translated");
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "Không thể tạo job dịch.");
     } finally {
@@ -159,6 +197,7 @@ function App() {
     setPageInput("1");
     setUploadError(null);
     setJob(null);
+    setMobileView("original");
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -183,57 +222,104 @@ function App() {
     return normalized;
   }
 
+  const renderSteps = [
+    { number: 1, label: "Tải tài liệu", hint: "PDF học thuật" },
+    { number: 2, label: "Chọn phạm vi", hint: "Toàn bộ hoặc một trang" },
+    { number: 3, label: "Bắt đầu dịch", hint: "Giữ nguyên bố cục" },
+  ];
+
   return (
     <main className="workspace-shell">
       <header className="workspace-header">
-        <div className="brand"><div className="brand-mark">PP</div><div><strong>PP-DocLayout</strong><span>Academic PDF Translation</span></div></div>
+        <div className="brand" aria-label="PP-DocLayout">
+          <div className="brand-mark" aria-hidden="true">PP</div>
+          <div className="brand-copy"><strong>PP-DocLayout</strong><span>Academic PDF Translation</span></div>
+        </div>
         <div className="header-actions">
-          <div className="zoom-controls" aria-label="Thu phóng PDF">
-            <button className="icon-button" title="Thu nhỏ PDF" onClick={() => setScale((value) => Math.max(0.5, value - 0.15))} type="button"><Minus size={16} /></button>
-            <span>{Math.round(scale * 100)}%</span>
-            <button className="icon-button" title="Phóng to PDF" onClick={() => setScale((value) => Math.min(1.6, value + 0.15))} type="button"><Plus size={16} /></button>
+          <div className="zoom-controls" role="group" aria-label="Thu phóng PDF">
+            <button className="icon-button" aria-label="Thu nhỏ PDF" title="Thu nhỏ PDF" onClick={() => setScale((value) => Math.max(0.5, value - 0.15))} type="button"><Minus size={16} /></button>
+            <span aria-live="polite">{Math.round(scale * 100)}%</span>
+            <button className="icon-button" aria-label="Phóng to PDF" title="Phóng to PDF" onClick={() => setScale((value) => Math.min(1.6, value + 0.15))} type="button"><Plus size={16} /></button>
           </div>
-          <span className="header-status">{file ? `${pageCount || "?"} trang` : "Sẵn sàng"}</span>
+          <span className={`header-status ${file ? "has-document" : ""}`}><span className="status-dot" />{file ? `${pageCount || "?"} trang` : "Sẵn sàng"}</span>
         </div>
       </header>
 
       <section className="workspace-grid">
         <aside className="control-column" aria-label="Tạo bản dịch">
-          <div className="control-heading"><p className="eyebrow">Tài liệu</p><h1>Dịch PDF học thuật</h1><p>Chọn phạm vi trước khi bắt đầu dịch.</p></div>
-          <input ref={inputRef} id="pdf-file" type="file" accept="application/pdf,.pdf" onChange={onFileInput} />
-          <button className={`drop-zone ${file ? "has-file" : ""}`} onClick={() => inputRef.current?.click()} onDragOver={(event) => event.preventDefault()} onDrop={onDrop} disabled={controlsLocked} type="button">
-            {isReading ? <LoaderCircle className="spin" size={27} /> : file ? <FileText size={27} /> : <Upload size={27} />}
-            <span>{file ? file.name : "Chọn hoặc thả tệp PDF"}</span>
-            <small>{file ? `${formatSize(file.size)} · ${pageCount ? `${pageCount} trang` : "Đang xác thực"}` : "PDF tối đa 100 MB"}</small>
-          </button>
-
-          <div className="scope-control" role="group" aria-label="Phạm vi dịch">
-            <button className={mode === "full" ? "selected" : ""} onClick={() => updateMode("full")} disabled={!file || controlsLocked} type="button">Toàn bộ</button>
-            <button className={mode === "page" ? "selected" : ""} onClick={() => updateMode("page")} disabled={!file || controlsLocked} type="button">Một trang</button>
+          <div className="control-heading">
+            <p className="eyebrow"><Sparkles size={14} /> Translation workspace</p>
+            <h1>Dịch PDF học thuật</h1>
+            <p>Biến tài liệu tiếng Anh thành bản tiếng Việt dễ đọc, vẫn giữ cấu trúc và bố cục gốc.</p>
           </div>
 
-          {mode === "page" && <label className="page-picker">Trang cần dịch<div><input type="number" min="1" value={pageInput} onChange={(event) => { const next = event.target.value; setPageInput(next); const numericPage = Number(next); if (Number.isInteger(numericPage) && numericPage >= 1 && (!pageCount || numericPage <= pageCount)) updatePage(numericPage); }} onBlur={normalizePageInput} disabled={!file || controlsLocked} /><span>/ {pageCount || "?"}</span></div></label>}
+          <ol className="workflow-steps" aria-label="Các bước dịch tài liệu">
+            {renderSteps.map((step) => {
+              const state = stepState(step.number, file, job);
+              return <li className={`workflow-step ${state}`} key={step.number}>
+                <span className="step-marker">{state === "complete" ? <Check size={15} /> : step.number}</span>
+                <span className="step-copy"><strong>{step.label}</strong><small>{step.hint}</small></span>
+              </li>;
+            })}
+          </ol>
 
-          {uploadError && <p className="error-text"><XCircle size={16} />{uploadError}</p>}
-          {job?.status === "failed" && <p className="error-text"><XCircle size={16} />{job.error}</p>}
+          <input ref={inputRef} id="pdf-file" className="visually-hidden" type="file" accept="application/pdf,.pdf" onChange={onFileInput} />
+          <button
+            className={`drop-zone ${file ? "has-file" : ""} ${isDragging ? "is-dragging" : ""}`}
+            onClick={() => inputRef.current?.click()}
+            onDragEnter={(event) => { event.preventDefault(); setIsDragging(true); }}
+            onDragOver={(event) => event.preventDefault()}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={onDrop}
+            disabled={controlsLocked || isReading}
+            aria-describedby="upload-hint"
+            type="button"
+          >
+            <span className="drop-icon">{isReading ? <LoaderCircle className="spin" size={25} /> : file ? <FileCheck2 size={25} /> : <Upload size={25} />}</span>
+            <span className="drop-title">{isReading ? "Đang đọc tài liệu..." : file ? file.name : "Chọn hoặc thả tệp PDF"}</span>
+            <small id="upload-hint">{file ? `${formatSize(file.size)} · ${pageCount} trang` : "PDF tối đa 100 MB · xử lý ngay trên workspace"}</small>
+          </button>
+
+          <div className="section-label"><span>Phạm vi dịch</span><span className="section-number">02</span></div>
+          <div className="scope-control" role="group" aria-label="Phạm vi dịch">
+            <button className={mode === "full" ? "selected" : ""} aria-pressed={mode === "full"} onClick={() => updateMode("full")} disabled={!file || controlsLocked} type="button"><span>Toàn bộ</span><small>{pageCount || "—"} trang</small></button>
+            <button className={mode === "page" ? "selected" : ""} aria-pressed={mode === "page"} onClick={() => updateMode("page")} disabled={!file || controlsLocked} type="button"><span>Một trang</span><small>Thử nhanh</small></button>
+          </div>
+
+          {mode === "page" && <label className="page-picker" htmlFor="page-number"><span>Trang cần dịch</span><span className="page-input-wrap"><input id="page-number" type="number" min="1" max={pageCount || undefined} value={pageInput} onChange={(event) => { const next = event.target.value; setPageInput(next); const numericPage = Number(next); if (Number.isInteger(numericPage) && numericPage >= 1 && (!pageCount || numericPage <= pageCount)) updatePage(numericPage); }} onBlur={normalizePageInput} disabled={!file || controlsLocked} /><span>/ {pageCount || "?"}</span></span></label>}
+
+          {uploadError && <p className="error-text" role="alert"><XCircle size={16} />{uploadError}</p>}
+          {job?.status === "failed" && <p className="error-text" role="alert"><XCircle size={16} />{job.error || "Không thể hoàn tất bản dịch."}</p>}
+
+          {job && <div className={`status-card status-${job.status}`} role="status" aria-live="polite" aria-atomic="true">
+            <div className="status-card-heading"><span className="status-icon">{job.status === "completed" ? <CheckCircle2 size={17} /> : job.status === "failed" ? <XCircle size={17} /> : <LoaderCircle className="spin" size={17} />}</span><span><strong>{statusLabel(job)}</strong><small>{statusDescription(job)}</small></span></div>
+            {job.status !== "failed" && <div className="progress-track" aria-label={`Tiến độ ${Math.round(statusProgress(job))}%`}><span style={{ width: `${statusProgress(job)}%` }} /></div>}
+            <div className="status-meta"><span>{job.mode === "page" ? "Một trang" : `${job.total_pages} trang`}</span>{job.status === "translating" && <span>{job.completed_pages}/{job.total_pages} đã dịch</span>}</div>
+          </div>}
 
           <button className="primary-action" onClick={() => void submit()} disabled={!file || isReading || isSubmitting || controlsLocked} type="button">
             {isSubmitting || jobActive ? <LoaderCircle className="spin" size={18} /> : <ArrowRight size={18} />}
-            {jobActive ? statusLabel(job) : "Bắt đầu dịch"}
+            <span>{jobActive ? statusLabel(job) : "Bắt đầu dịch"}</span>
           </button>
 
           {job?.status === "completed" && <a className="download-button" href={translatedSource ?? undefined} download><Download size={17} />Tải PDF dịch</a>}
           {(file || job) && <button className="reset-button" onClick={reset} disabled={jobActive} type="button"><RotateCcw size={16} />Tài liệu mới</button>}
+          <p className="privacy-note"><Info size={14} /> Tài liệu chỉ được dùng cho phiên dịch hiện tại.</p>
         </aside>
 
-        <PdfPanel title="PDF gốc" source={file} mode={mode} pageNumber={sourcePage} knownPages={pageCount} scale={scale} onLoadPages={setPageCount} />
-        <PdfPanel title="Bản dịch tiếng Việt" source={translatedSource} mode={mode} pageNumber={translatedPage} knownPages={mode === "full" ? job?.total_pages ?? 0 : 1} scale={scale} status={statusLabel(job)} completed={job?.status === "completed"} />
+        <div className="mobile-preview-tabs" role="tablist" aria-label="Chọn bản xem trước">
+          <button role="tab" aria-selected={mobileView === "original"} className={mobileView === "original" ? "selected" : ""} onClick={() => setMobileView("original")} type="button">PDF gốc</button>
+          <button role="tab" aria-selected={mobileView === "translated"} className={mobileView === "translated" ? "selected" : ""} onClick={() => setMobileView("translated")} type="button">Bản dịch tiếng Việt</button>
+        </div>
+
+        <PdfPanel title="PDF gốc" source={file} mode={mode} pageNumber={sourcePage} knownPages={pageCount} scale={scale} onLoadPages={setPageCount} mobileView={mobileView} panelView="original" />
+        <PdfPanel title="Bản dịch tiếng Việt" source={translatedSource} mode={mode} pageNumber={translatedPage} knownPages={mode === "full" ? job?.total_pages ?? 0 : 1} scale={scale} status={statusLabel(job)} completed={job?.status === "completed"} mobileView={mobileView} panelView="translated" />
       </section>
     </main>
   );
 }
 
-function PdfPanel({ title, source, mode, pageNumber, knownPages, scale, onLoadPages, status, completed }: {
+function PdfPanel({ title, source, mode, pageNumber, knownPages, scale, onLoadPages, status, completed, mobileView, panelView }: {
   title: string;
   source: PdfSource;
   mode: Mode;
@@ -243,9 +329,12 @@ function PdfPanel({ title, source, mode, pageNumber, knownPages, scale, onLoadPa
   onLoadPages?: (pages: number) => void;
   status?: string;
   completed?: boolean;
+  mobileView: MobileView;
+  panelView: MobileView;
 }) {
   const [loadedPages, setLoadedPages] = useState(0);
   const [error, setError] = useState(false);
+  const isOriginal = panelView === "original";
 
   useEffect(() => {
     setLoadedPages(0);
@@ -258,12 +347,15 @@ function PdfPanel({ title, source, mode, pageNumber, knownPages, scale, onLoadPa
     : [pageNumber];
 
   return (
-    <section className="document-column">
-      <header><div><strong>{title}</strong><small>{mode === "page" ? `Trang ${pageNumber}` : totalPages ? `${totalPages} trang` : ""}</small></div>{completed && <CheckCircle2 size={18} />}</header>
-      <div className="document-scroll">
-        {!source && <div className="document-placeholder">{status && status !== "Chưa có bản dịch" ? <><LoaderCircle className="spin" size={30} /><strong>{status}</strong><span>PDF dịch sẽ xuất hiện tại đây khi hoàn tất.</span></> : <><FileText size={30} /><strong>{title === "PDF gốc" ? "Chọn PDF để xem trước" : "Chưa có bản dịch"}</strong><span>{title === "PDF gốc" ? "Tài liệu nguồn sẽ hiển thị ngay sau khi chọn file." : "Chọn tài liệu và bắt đầu dịch để xem kết quả."}</span></>}</div>}
-        {source && error && <p className="error-text"><XCircle size={16} />Không thể hiển thị PDF.</p>}
-        {source && !error && <Document file={source} loading={<LoaderCircle className="spin" size={30} />} error={<p className="error-text"><XCircle size={16} />Không thể tải PDF.</p>} onLoadSuccess={({ numPages }) => { setLoadedPages(numPages); onLoadPages?.(numPages); }} onLoadError={() => setError(true)}>
+    <section className={`document-column ${mobileView !== panelView ? "mobile-panel-hidden" : ""}`} aria-label={title}>
+      <header className="document-header">
+        <div className="document-heading"><span className={`document-icon ${isOriginal ? "original" : "translated"}`}>{isOriginal ? <FileText size={16} /> : <FileCheck2 size={16} />}</span><div><strong>{title}</strong><small>{mode === "page" ? `Trang ${pageNumber}` : totalPages ? `${totalPages} trang` : "Chưa có tài liệu"}</small></div></div>
+        {completed && <span className="completed-badge"><CheckCircle2 size={16} /> Sẵn sàng</span>}
+      </header>
+      <div className="document-scroll" tabIndex={0} aria-label={`Vùng xem ${title}`}>
+        {!source && <div className="document-placeholder">{status && status !== "Chưa có bản dịch" ? <><LoaderCircle className="placeholder-icon spin" size={30} /><strong>{status}</strong><span>PDF dịch sẽ xuất hiện tại đây khi hoàn tất.</span></> : <><span className="placeholder-icon"><FileText size={27} /></span><strong>{isOriginal ? "Chọn PDF để xem trước" : "Chưa có bản dịch"}</strong><span>{isOriginal ? "Tài liệu nguồn sẽ hiển thị ngay sau khi chọn file." : "Chọn tài liệu và bắt đầu dịch để xem kết quả."}</span></>}</div>}
+        {source && error && <p className="error-text" role="alert"><XCircle size={16} />Không thể hiển thị PDF.</p>}
+        {source && !error && <Document file={source} loading={<div className="document-loading" role="status"><LoaderCircle className="spin" size={26} /><span>Đang tải bản xem trước...</span></div>} error={<p className="error-text" role="alert"><XCircle size={16} />Không thể tải PDF.</p>} onLoadSuccess={({ numPages }) => { setLoadedPages(numPages); onLoadPages?.(numPages); }} onLoadError={() => setError(true)}>
           <div className="pdf-pages">{pages.map((page) => <Page key={page} pageNumber={page} scale={scale} renderTextLayer={false} renderAnnotationLayer={false} />)}</div>
         </Document>}
       </div>
