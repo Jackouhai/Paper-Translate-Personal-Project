@@ -13,6 +13,7 @@ def test_default_settings():
     assert settings.paddle_ocr_server_url == "http://127.0.0.1:8000/v1"
     assert settings.parse_api_base_url == "http://127.0.0.1:8082"
     assert settings.paddle_ocr_client_device == "auto"
+    assert settings.paddle_ocr_merge_layout_blocks is False
     assert settings.output_dir == "output"
     assert settings.playwright_browser_channel is None
 

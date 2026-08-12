@@ -78,7 +78,7 @@ class Settings(BaseSettings):
         description="Parse charts separately"
     )
     paddle_ocr_merge_layout_blocks: bool = Field(
-        default=True,
+        default=False,
         description="Merge related layout blocks"
     )
     paddle_ocr_layout_detection_model_name: str = Field(
