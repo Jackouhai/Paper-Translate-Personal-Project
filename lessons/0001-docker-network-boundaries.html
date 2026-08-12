@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bài 1 · Ranh giới mạng Docker</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<main><article>
+  <p class="eyebrow">Bài 1 · Docker demo trên VPS</p>
+  <h1>Ranh giới mạng: internal khác public như thế nào?</h1>
+  <p class="source">Mục tiêu: sau bài này bạn tự đọc được phần <code>ports</code> trong Compose và biết service nào được phép lộ ra Internet.</p>
+
+  <h2>1. Ý tưởng cốt lõi</h2>
+  <p>Compose tự tạo một network nội bộ. Các container trong network đó gọi nhau bằng <strong>tên service</strong>, ví dụ <code>web-api</code> gọi <code>http://translate-gemma:8001/v1</code>. Không cần publish port ra host cho việc này.</p>
+  <p>Ngược lại, <code>ports: "8001:8001"</code> nghĩa là port 8001 của container được đưa ra port 8001 trên host. Nếu host là VPS public, port đó có thể bị Internet truy cập — tùy firewall.</p>
+  <div class="callout"><strong>Quy tắc nhớ:</strong> service-to-service dùng tên service; chỉ publish thứ mà người dùng bên ngoài thật sự cần.</div>
+  <p class="source">Nguồn: <a href="https://docs.docker.com/compose/how-tos/networking/">Docker Networking in Compose</a>.</p>
+
+  <h2>2. Vẽ demo hiện tại</h2>
+  <div class="diagram">Internet / browser
+        │
+        ▼  chỉ nên vào frontend
+  web-frontend :80  ← host :3000
+        │ internal network
+        ▼
+  web-api :8083
+     ├── parse-api :8082
+     │      └── paddle-ocr-vl :8000
+     └── translate-gemma :8001</div>
+  <p>Trong sơ đồ, các port 8083, 8082, 8000, 8001 là đường nội bộ giữa container. Port 3000 mới là điểm vào cho browser trong demo local. Trên VPS có tunnel, tunnel nên trỏ vào <code>web-frontend</code>, không trỏ thẳng vào model server.</p>
+
+  <h2>3. Đọc Compose bằng một câu hỏi</h2>
+  <p>Mở <a href="../compose.yaml">compose.yaml</a> và với mỗi <code>ports:</code>, hỏi:</p>
+  <ol>
+    <li>Ai cần truy cập port này: browser, host để debug, hay container khác?</li>
+    <li>Nếu là container khác, có thể bỏ <code>ports</code> và dùng tên service không?</li>
+    <li>Nếu host cần debug, có thể bind <code>127.0.0.1</code> không?</li>
+  </ol>
+  <p>Ví dụ an toàn hơn cho model server:</p>
+  <pre>ports:
+  - "127.0.0.1:8001:8001"</pre>
+  <p>Hoặc nếu không cần gọi từ host:</p>
+  <pre># bỏ toàn bộ ports của translate-gemma
+# web-api vẫn gọi được:
+# http://translate-gemma:8001/v1</pre>
+
+  <h2>4. Thực hành 5 phút</h2>
+  <ol>
+    <li>Chạy <code>docker compose config --quiet</code>. Không có output và exit code 0 nghĩa là Compose parse được.</li>
+    <li>Chạy <code>docker compose config</code>, tìm tất cả dòng <code>ports:</code>.</li>
+    <li>Ghi ra giấy 3 cột: port, ai cần, public hay internal.</li>
+    <li>Chạy <code>ss -ltnp</code> trên VPS để xem host đang lắng nghe port nào.</li>
+  </ol>
+  <p>Đừng sửa file ngay. Trước tiên hãy gửi lại bảng phân loại của bạn; đó là bước kiểm tra hiểu bài.</p>
+
+  <h2>5. Tự kiểm tra</h2>
+  <p>Hãy trả lời bằng đúng ba dòng theo mẫu này:</p>
+  <pre>3000: ...
+8000: ...
+8001: ...</pre>
+  <p>Trong mỗi dòng, điền <code>public</code> hoặc <code>internal</code> và một lý do ngắn. Không cần nhớ thuật ngữ khác.</p>
+
+  <h2>Bài đọc chính</h2>
+  <p><a href="https://docs.docker.com/compose/how-tos/networking/">Docker Networking in Compose</a> — đọc phần “Default network and service discovery”. Sau đó xem lại <a href="../reference/docker-demo-checklist.html">Docker demo checklist</a>.</p>
+  <p>Nếu có điểm nào chưa rõ, hãy hỏi tiếp; bài sau sẽ nối từ network sang GPU pass-through và healthcheck.</p>
+</article></main>
+</body>
+</html>

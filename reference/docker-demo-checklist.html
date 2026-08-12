@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Docker demo checklist</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<main><article>
+  <p class="eyebrow">PP-DocLayout · quick reference</p>
+  <h1>Docker demo checklist</h1>
+  <p>Thứ tự kiểm tra an toàn trước khi public một demo Compose trên VPS.</p>
+
+  <h2>1. Phân loại port</h2>
+  <ul>
+    <li><strong>Public:</strong> frontend hoặc reverse proxy, ví dụ <code>3000:80</code>.</li>
+    <li><strong>Internal:</strong> <code>web-api</code>, <code>parse-api</code>, vLLM; gọi nhau bằng tên service.</li>
+    <li><strong>Local-only:</strong> port cần truy cập từ host để debug, bind vào <code>127.0.0.1</code>.</li>
+  </ul>
+
+  <h2>2. Chuỗi healthcheck</h2>
+  <p><code>translate-gemma</code> / <code>paddle-ocr-vl</code> → <code>parse-api</code> → <code>web-api</code> → <code>web-frontend</code>.</p>
+  <p>Container phụ thuộc chỉ khởi động sau khi dependency đạt <code>healthy</code>.</p>
+
+  <h2>3. Lệnh kiểm tra</h2>
+  <pre>docker compose config --quiet
+docker compose ps
+docker compose logs --tail=100 web-api
+nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04 nvidia-smi
+ss -ltnp</pre>
+
+  <h2>4. Checklist trước public</h2>
+  <ul class="check">
+    <li>Chỉ frontend/reverse proxy có port public.</li>
+    <li>Model ports không bind ra Internet.</li>
+    <li>Image và tunnel không dùng tag mutable như <code>latest</code>.</li>
+    <li>Đã kiểm tra VRAM với đúng profile của GPU.</li>
+    <li>Đã biết cách xem log và dừng tunnel.</li>
+    <li>Đã có kế hoạch xoá job/output cũ và giới hạn log.</li>
+  </ul>
+</article></main>
+</body>
+</html>
