@@ -27,7 +27,7 @@ body{
   overflow:hidden;
   white-space: pre-wrap;
   line-height:1.2;
-  text-align: justify
+  text-align:left;
 }
 
 h1, h2 {
@@ -41,17 +41,22 @@ h1, h2 {
   font-weight:bold;
   text-align:center;
   text-wrap:balance;
+  white-space:normal;
 }
 
 .block.paragraph_title{
   font-weight:bold;
   text-wrap:balance;
+  white-space:normal;
+  text-align:left;
 }
 
 /* ===== CAPTION ===== */
 
 .block.figure_title,
 .block.table_caption{
+  text-align:left;
+  white-space:normal;
 }
 
 /* ===== ABSTRACT ===== */
@@ -61,6 +66,7 @@ h1, h2 {
 
 /* ===== TEXT ===== */
 
+.block.abstract,
 .block.text{
   text-align:justify;
 }
@@ -75,6 +81,11 @@ h1, h2 {
 }
 
 /* ===== TABLE ===== */
+
+.table-container{
+  width:100%;
+  height:100%;
+}
 
 .block table{
   border-collapse:collapse;
