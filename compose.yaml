@@ -80,6 +80,7 @@ services:
       PPDOCLAYOUT_PADDLE_OCR_SERVER_URL: http://paddle-ocr-vl:8000/v1
       PPDOCLAYOUT_PADDLE_OCR_CLIENT_DEVICE: ${PARSE_API_DEVICE:-auto}
       PPDOCLAYOUT_PADDLE_OCR_USE_CHART_RECOGNITION: "false"
+      PPDOCLAYOUT_PADDLE_OCR_MERGE_LAYOUT_BLOCKS: ${PADDLE_OCR_MERGE_LAYOUT_BLOCKS:-false}
       HF_HOME: /models/huggingface
     volumes:
       - ./output:/app/output

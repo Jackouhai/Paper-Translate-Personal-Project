@@ -44,3 +44,12 @@ def test_paddle_ocr_client_device_env(monkeypatch):
     settings = Settings(_env_file=None)
 
     assert settings.paddle_ocr_client_device == "gpu:0"
+
+
+def test_merge_layout_blocks_env(monkeypatch):
+    """Allow the Docker/VPS profile to disable block merging explicitly."""
+    monkeypatch.setenv("PPDOCLAYOUT_PADDLE_OCR_MERGE_LAYOUT_BLOCKS", "false")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.paddle_ocr_merge_layout_blocks is False

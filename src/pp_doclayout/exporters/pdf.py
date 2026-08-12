@@ -62,22 +62,12 @@ class PDFExporter(BaseExporter):
                     try:
                         # Chờ JS fitting
                         page.wait_for_function(
-                            "() => { const els = document.querySelectorAll('.auto-fit'); return els.length === 0 || Array.from(els).every(el => el.style.fontSize !== ''); }",
-                            timeout=10000,
+                            "() => window.__ppDoclayoutFitComplete === true",
+                            timeout=15000,
                         )
                     except PlaywrightTimeoutError:
                         logger.warning(
-                            "Text auto-fit timed out; continuing PDF export"
-                        )
-                    # Chờ MathJax render
-                    try:
-                        page.wait_for_function(
-                            "() => { const mjx = document.querySelectorAll('mjx-container'); return mjx.length > 0 || !window.MathJax; }",
-                            timeout=5000,
-                        )
-                    except PlaywrightTimeoutError:
-                        logger.warning(
-                            "MathJax rendering timed out; continuing PDF export"
+                            "Text/MathJax auto-fit timed out; continuing PDF export"
                         )
                     # Extract page size từ data
                     first_page = project_data["pages"][0]

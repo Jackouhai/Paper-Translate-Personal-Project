@@ -202,7 +202,7 @@ def test_pdf_exporter_scales_parsed_coordinates_to_source_page(
     )
 
 
-def test_pdf_export_continues_when_auto_fit_times_out(
+def test_pdf_export_continues_when_final_fit_times_out(
     tmp_path,
     monkeypatch,
 ):
@@ -321,6 +321,36 @@ def test_pdf_exporter_preserves_existing_html_artifact(tmp_path, monkeypatch):
     ).exists()
 
 
+def test_pdf_export_waits_for_final_fit_marker(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    output_path = Path("result.pdf")
+    project_data = {
+        "project_name": "test",
+        "pages": [{
+            "input_path": "input.pdf",
+            "page_index": 0,
+            "width": 800,
+            "height": 1200,
+            "html_content": '<div class="block text auto-fit">$x$</div>',
+        }],
+    }
+
+    with patch(
+        "pp_doclayout.exporters.pdf.sync_playwright"
+    ) as mock_sync_playwright:
+        playwright = MagicMock()
+        mock_sync_playwright.return_value.__enter__.return_value = (
+            playwright
+        )
+        browser = playwright.chromium.launch.return_value
+        page = browser.new_page.return_value
+
+        PDFExporter().export(project_data, output_path)
+
+    wait_call = page.wait_for_function.call_args.args[0]
+    assert "__ppDoclayoutFitComplete" in wait_call
+
+
 def test_html_exporter_preserves_ocr_whitespace(tmp_path):
     exporter = HTMLExporter()
 
@@ -365,6 +395,25 @@ def test_html_exporter_uses_bounded_font_size_search(tmp_path):
     assert "const middleStep = Math.floor" in content
     assert "startSize -= 1" not in content
     assert "startSize -= 0.5" not in content
+
+
+def test_html_exporter_waits_for_mathjax_before_marking_fit_complete(tmp_path):
+    project_data = {
+        "project_name": "test",
+        "pages": [{
+            "page_index": 0,
+            "html_content": '<div class="block text auto-fit">$x$</div>',
+        }],
+    }
+
+    output_path = tmp_path / "result.html"
+    HTMLExporter().export(project_data, output_path)
+
+    content = output_path.read_text(encoding="utf-8")
+
+    assert "window.__ppDoclayoutFitComplete = false;" in content
+    assert "window.MathJax.startup.promise" in content
+    assert "fitAfterMathJax();" in content
 
 
 def test_html_exporter_includes_pdf_pagination_css(tmp_path):

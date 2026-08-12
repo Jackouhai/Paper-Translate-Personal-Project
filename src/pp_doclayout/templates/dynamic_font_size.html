@@ -6,6 +6,21 @@ function textFits(el) {
     );
 }
 
+function fitMathText(el, minSize, maxSize) {
+    // MathJax can reflow non-monotonically at different font sizes, so a
+    // binary search may skip a larger size that still fits the block.
+    for (let step = Math.floor(maxSize * 2); step >= Math.ceil(minSize * 2); step--) {
+        const fontSize = step / 2;
+        el.style.fontSize = fontSize + "px";
+
+        if (textFits(el)) {
+            return;
+        }
+    }
+
+    el.style.fontSize = minSize + "px";
+}
+
 function fitText(el) {
     const cls = el.className || "";
 
@@ -24,6 +39,11 @@ function fitText(el) {
     } else if (cls.includes("abstract")) {
         minSize = 9;
         maxSize = 30;
+    }
+
+    if (el.querySelector("mjx-container")) {
+        fitMathText(el, minSize, maxSize);
+        return;
     }
 
     // Search integer steps so each step represents 0.5px.
@@ -48,17 +68,116 @@ function fitText(el) {
     el.style.fontSize = bestStep / 2 + "px";
 }
 
+function fitTable(container) {
+    const table = container.querySelector("table");
+    if (!table) {
+        return;
+    }
+
+    // Table layout, especially with MathJax in cells, is not monotonic as
+    // font size changes. Scan down to retain the largest fitting font.
+    for (let step = 32; step >= 16; step--) {
+        const fontSize = step / 2;
+        table.style.fontSize = fontSize + "px";
+
+        if (
+            table.scrollHeight <= container.clientHeight &&
+            table.scrollWidth <= container.clientWidth
+        ) {
+            return;
+        }
+    }
+
+    table.style.fontSize = "8px";
+}
+
 function fitAllText() {
     document.querySelectorAll(".auto-fit").forEach(fitText);
 }
 
-document.addEventListener("DOMContentLoaded", fitAllText);
+function fitAllTables() {
+    document.querySelectorAll(".block.table").forEach(fitTable);
+}
 
-window.addEventListener("load", () => {
+function fitAllBlocks() {
     fitAllText();
+    fitAllTables();
+}
+
+window.__ppDoclayoutFitComplete = false;
+
+function mathJaxReadyPromise() {
+    if (window.MathJax?.startup?.promise) {
+        return window.MathJax.startup.promise;
+    }
 
     if (window.MathJax?.typesetPromise) {
-        MathJax.typesetPromise().then(fitAllText);
+        return window.MathJax.typesetPromise();
     }
+
+    return null;
+}
+
+function waitForMathJaxReady(timeoutMs = 10000) {
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = (promise) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            resolve(promise);
+        };
+
+        const script = document.getElementById("MathJax-script");
+        if (script) {
+            script.addEventListener(
+                "load",
+                () => finish(mathJaxReadyPromise()),
+                { once: true },
+            );
+            script.addEventListener("error", () => finish(null), { once: true });
+        }
+
+        const deadline = performance.now() + timeoutMs;
+        const poll = () => {
+            const promise = mathJaxReadyPromise();
+            if (promise) {
+                finish(promise);
+                return;
+            }
+
+            if (performance.now() >= deadline) {
+                finish(null);
+                return;
+            }
+
+            window.setTimeout(poll, 25);
+        };
+
+        poll();
+    });
+}
+
+async function fitAfterMathJax() {
+    const promise = await waitForMathJaxReady();
+
+    if (promise) {
+        try {
+            await promise;
+        } catch (error) {
+            console.warn("MathJax typesetting failed; keeping fallback fit", error);
+        }
+    }
+
+    fitAllBlocks();
+    window.__ppDoclayoutFitComplete = true;
+}
+
+document.addEventListener("DOMContentLoaded", fitAllBlocks);
+
+window.addEventListener("load", () => {
+    fitAllBlocks();
+    fitAfterMathJax();
 });
 </script>
