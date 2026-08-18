@@ -46,6 +46,43 @@ def test_translate_logs_error_after_final_retry(caplog):
     assert "server unavailable" in caplog.text
 
 
+def test_auto_backend_falls_back_to_transformers():
+    translator = object.__new__(GemmaTranslator)
+    translator.backend = "auto"
+    translator.model_name = "test-model"
+    translator.retry_attempts = 0
+    translator._get_max_tokens_for_text = lambda text: 512
+    translator.client = MagicMock()
+    translator.client.chat.completions.create.side_effect = RuntimeError(
+        "server unavailable"
+    )
+    translator._translate_with_transformers = MagicMock(
+        return_value="Ban dich local"
+    )
+
+    result = translator.translate("Source passage")
+
+    assert result == "Ban dich local"
+    translator._translate_with_transformers.assert_called_once_with(
+        "Source passage", "en", "vi", 512
+    )
+
+
+def test_transformers_backend_skips_vllm():
+    translator = object.__new__(GemmaTranslator)
+    translator.backend = "transformers"
+    translator.model_name = "test-model"
+    translator.retry_attempts = 0
+    translator._get_max_tokens_for_text = lambda text: 512
+    translator.client = MagicMock()
+    translator._translate_with_transformers = MagicMock(return_value="Ban dich")
+
+    result = translator.translate("Source passage")
+
+    assert result == "Ban dich"
+    translator.client.chat.completions.create.assert_not_called()
+
+
 def test_translate_sends_research_paper_context_prompt():
     translator = object.__new__(GemmaTranslator)
     translator.model_name = "test-model"

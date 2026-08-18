@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from pypdf import PdfReader, PdfWriter
 
 from pp_doclayout.config import settings
-from pp_doclayout.core.parse_api_client import parse_pdf_via_api
+from pp_doclayout.core.parse_api_client import ParseAPIError, parse_pdf_via_api
 from pp_doclayout.core.workflow import ProgressCallback, translate_and_export_project
 from pp_doclayout.translators import get_gemma
 from pp_doclayout.utils.server_health import check_server_health
@@ -60,11 +60,18 @@ class DemoJobResponse(BaseModel):
 
 
 def _default_parse_operation(pdf_path: Path, project_dir: Path) -> Path:
-    return parse_pdf_via_api(
-        pdf_path,
-        settings.parse_api_base_url,
-        output_dir=project_dir,
-    )
+    try:
+        return parse_pdf_via_api(
+            pdf_path,
+            settings.parse_api_base_url,
+            output_dir=project_dir,
+        )
+    except ParseAPIError:
+        if settings.parsing_backend.lower() != "auto":
+            raise
+        from pp_doclayout.cli import _parse_locally
+
+        return _parse_locally(pdf_path, str(project_dir))
 
 
 def _default_translate_operation(
@@ -73,13 +80,16 @@ def _default_translate_operation(
     progress_callback: ProgressCallback,
     on_before_export: Callable[[], None],
 ) -> Path:
+    backend = settings.translation_backend.lower()
     health = check_server_health("TranslateGemma", settings.vllm_base_url)
-    if not health.available:
+    if not health.available and backend == "vllm":
         raise RuntimeError(f"TranslateGemma server is not ready: {health.message}")
+    if backend == "auto":
+        backend = "vllm" if health.available else "transformers"
 
     output_paths = translate_and_export_project(
         project_dir,
-        get_gemma(),
+        get_gemma(backend=backend),
         export_formats=("html", "pdf"),
         on_page_translated=progress_callback,
         on_before_export=on_before_export,

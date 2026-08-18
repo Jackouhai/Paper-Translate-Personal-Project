@@ -44,20 +44,24 @@ class ParseJobResponse(BaseModel):
 def _create_default_pipeline() -> Any:
     """Verify the remote OCR server before loading local layout models."""
 
-    health = check_server_health(
-        name="PaddleOCR-VL",
-        base_url=settings.paddle_ocr_server_url,
-    )
-    if not health.available:
-        raise RuntimeError(
-            f"PaddleOCR-VL server is not ready: {health.url}. "
-            f"Reason: {health.message}"
-        )
-
     # Keep the PaddleOCRVL construction in one place with the CLI configuration.
     from pp_doclayout.cli import _create_paddle_ocr_pipeline
 
-    return _create_paddle_ocr_pipeline()
+    backend = settings.paddle_ocr_backend
+    if backend == "vllm-server":
+        health = check_server_health(
+            name="PaddleOCR-VL",
+            base_url=settings.paddle_ocr_server_url,
+        )
+        if not health.available:
+            if settings.parsing_backend.lower() != "auto":
+                raise RuntimeError(
+                    f"PaddleOCR-VL server is not ready: {health.url}. "
+                    f"Reason: {health.message}"
+                )
+            backend = "native"
+
+    return _create_paddle_ocr_pipeline(backend=backend)
 
 
 def _parse_pdf(pipeline: Any, pdf_path: Path, project_dir: Path) -> Path:

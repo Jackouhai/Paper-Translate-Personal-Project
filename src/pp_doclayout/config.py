@@ -44,6 +44,14 @@ class Settings(BaseSettings):
         default="Infomaniak-AI/vllm-translategemma-4b-it",
         description="Model name for vLLM"
     )
+    translation_backend: str = Field(
+        default="auto",
+        description="Translation backend: auto, vllm, or transformers",
+    )
+    transformers_model_name: str = Field(
+        default="Infomaniak-AI/vllm-translategemma-4b-it",
+        description="Hugging Face model used by the Transformers fallback",
+    )
 
     # ===== PaddleOCR-VL Server Settings =====
     paddle_ocr_server_url: str = Field(
@@ -54,9 +62,25 @@ class Settings(BaseSettings):
         default="http://127.0.0.1:8082",
         description="URL for the long-lived local Parse API",
     )
+    parsing_backend: str = Field(
+        default="auto",
+        description="Parsing backend: auto, api, or local",
+    )
     paddle_ocr_backend: str = Field(
         default="vllm-server",
         description="Backend for PaddleOCR-VL (vllm-server or local)"
+    )
+    paddle_model_source: str = Field(
+        default="huggingface",
+        description="PaddleX official-model source: huggingface, bos, modelscope, or aistudio",
+    )
+    paddle_huggingface_endpoint: str | None = Field(
+        default=None,
+        description="Optional Hugging Face endpoint or mirror used by PaddleX",
+    )
+    paddle_ocr_vl_model_name: str | None = Field(
+        default=None,
+        description="Optional native PaddleOCR-VL recognition model name",
     )
     paddle_ocr_client_device: str = Field(
         default="auto",
