@@ -36,6 +36,7 @@ url = "https://pypi.org/simple/"
 default = true
 
 [tool.uv]
+package = true
 environments = ["sys_platform == 'linux'"]
 index-strategy = "unsafe-best-match"
 [tool.uv.sources]
@@ -52,3 +53,10 @@ dev = [
 
 [project.scripts]
 pp-doclayout = "pp_doclayout.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pp_doclayout"]

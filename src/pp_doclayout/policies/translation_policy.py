@@ -5,7 +5,6 @@ TranslateAction = Literal["translate", "keep", "skip"]
 NO_TRANSLATE_LABELS = frozenset(
     [
         "doc_title",
-        "paragraph_title",
         "reference_content",
         "footnote",
         "vision_footnote",
@@ -24,7 +23,12 @@ SKIP_LABELS = frozenset(["aside_text", "header", "footer", "content"])
 TRANSLATE_LABELS = frozenset(["abstract", "text", "figure_title"])
 
 
-def should_translate(label: str, content: str) -> TranslateAction:
+def should_translate(
+    label: str,
+    content: str,
+    *,
+    translate_titles: bool = False,
+) -> TranslateAction:
     if label in SKIP_LABELS:
         return "skip"
 
@@ -36,6 +40,9 @@ def should_translate(label: str, content: str) -> TranslateAction:
         and (len(content_lower) < 50 or len(words) < 4)
     ):
         return "skip"
+
+    if label == "paragraph_title":
+        return "translate" if translate_titles else "keep"
 
     if label in NO_TRANSLATE_LABELS:
         return "keep"

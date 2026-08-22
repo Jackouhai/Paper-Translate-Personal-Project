@@ -85,6 +85,13 @@ Nếu kiểm tra PaddlePaddle fail, sửa Paddle/CUDA trước khi chạy `parse
 Lệnh mặc định xuất đồng thời `output/paper/translated_paper.html` và
 `output/paper/translated_paper.pdf`.
 
+Mặc định, các tiêu đề mục (`paragraph_title`) được giữ nguyên ngôn ngữ nguồn.
+Chỉ bật dịch tiêu đề khi cần:
+
+```bash
+uv run -m pp_doclayout.cli run paper.pdf --translate-titles
+```
+
 Mặc định, PDF export dùng Chromium do Playwright quản lý. Để dùng browser đã
 cài trên hệ thống, đặt browser channel trong `.env`:
 
@@ -149,6 +156,7 @@ docker compose up -d paddle-ocr-vl translate-gemma parse-api web-api web-fronten
 Cột trái dùng để upload PDF và chọn toàn bộ tài liệu hoặc một trang. PDF gốc
 hiện ngay ở cột giữa; sau khi dịch xong, PDF dịch hiện ở cột phải. Điều khiển
 zoom dùng chung cho cả hai tài liệu.
+Nút "Dịch tiêu đề mục" mặc định tắt và tương ứng với option CLI ở trên.
 
 Bước parse chạy tuần tự để model DocLayout ổn định. Trên cấu hình local, tối
 đa năm job parse xong có thể vào bước dịch đồng thời; mỗi job gửi tối đa bốn

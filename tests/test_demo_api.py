@@ -44,6 +44,7 @@ def test_demo_api_translates_a_selected_page_and_serves_artifacts(tmp_path: Path
     _write_pdf(source_pdf, pages=2)
     parsed_page_counts: list[int] = []
     translated_project_dirs: list[Path] = []
+    translated_title_options: list[bool] = []
 
     def parse_operation(pdf_path: Path, project_dir: Path) -> Path:
         parsed_page_counts.append(len(PdfReader(str(pdf_path)).pages))
@@ -51,8 +52,15 @@ def test_demo_api_translates_a_selected_page_and_serves_artifacts(tmp_path: Path
         parsed_project_dir.mkdir(parents=True)
         return parsed_project_dir
 
-    def translate_operation(project_dir, translated_pdf_path, progress, before_export):
+    def translate_operation(
+        project_dir,
+        translated_pdf_path,
+        progress,
+        before_export,
+        translate_titles,
+    ):
         translated_project_dirs.append(project_dir)
+        translated_title_options.append(translate_titles)
         progress(1, 1)
         before_export()
         _write_pdf(translated_pdf_path)
@@ -79,6 +87,7 @@ def test_demo_api_translates_a_selected_page_and_serves_artifacts(tmp_path: Path
                 job = await _wait_for_completion(client, job_id)
                 assert job["status"] == "completed"
                 assert job["completed_pages"] == 1
+                assert job["translate_titles"] is False
                 assert job["translated_pdf_available"] is True
 
                 source_response = await client.get(f"/jobs/{job_id}/source.pdf")
@@ -91,6 +100,7 @@ def test_demo_api_translates_a_selected_page_and_serves_artifacts(tmp_path: Path
     asyncio.run(submit_and_check())
     assert parsed_page_counts == [1]
     assert translated_project_dirs[0].name == "parser-output"
+    assert translated_title_options == [False]
 
 
 def test_demo_api_rejects_invalid_page_and_busy_queue(tmp_path: Path):
@@ -103,7 +113,13 @@ def test_demo_api_rejects_invalid_page_and_busy_queue(tmp_path: Path):
         project_dir.mkdir(parents=True)
         return project_dir
 
-    def translate_operation(project_dir, translated_pdf_path, progress, before_export):
+    def translate_operation(
+        project_dir,
+        translated_pdf_path,
+        progress,
+        before_export,
+        translate_titles,
+    ):
         before_export()
         _write_pdf(translated_pdf_path)
         return translated_pdf_path
@@ -174,7 +190,13 @@ def test_demo_api_serializes_parse_and_runs_two_translations(tmp_path: Path):
             parse_active -= 1
         return project_dir
 
-    def translate_operation(project_dir, translated_pdf_path, progress, before_export):
+    def translate_operation(
+        project_dir,
+        translated_pdf_path,
+        progress,
+        before_export,
+        translate_titles,
+    ):
         nonlocal translation_active, max_translation_active
         with counters_lock:
             translation_active += 1

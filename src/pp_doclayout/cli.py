@@ -150,6 +150,11 @@ def translate(
         "-f",
         help="Định dạng export, phân tách bằng dấu phẩy (default: html,pdf)",
     ),
+    translate_titles: bool = typer.Option(
+        False,
+        "--translate-titles",
+        help="Dịch các tiêu đề mục (paragraph_title). Mặc định giữ nguyên.",
+    ),
 ):
     """Dịch project đã parse và export artifact đã chọn.
 
@@ -168,6 +173,7 @@ def translate(
         translator,
         output_suffix=output_suffix,
         export_formats=_parse_export_formats(export_formats),
+        translate_titles=translate_titles,
     )
     for output_path in output_paths:
         typer.echo(f"✓ {output_path.suffix[1:].upper()} created: {output_path}")
@@ -187,6 +193,11 @@ def run(
         "--format",
         "-f",
         help="Định dạng export, phân tách bằng dấu phẩy (default: html,pdf)",
+    ),
+    translate_titles: bool = typer.Option(
+        False,
+        "--translate-titles",
+        help="Dịch các tiêu đề mục (paragraph_title). Mặc định giữ nguyên.",
     ),
 ):
     """Full pipeline: parse + translate.
@@ -216,6 +227,7 @@ def run(
         translator,
         output_suffix=output_suffix,
         export_formats=_parse_export_formats(export_formats),
+        translate_titles=translate_titles,
     )
     for output_path in output_paths:
         typer.echo(f"✓ {output_path.suffix[1:].upper()} created: {output_path}")

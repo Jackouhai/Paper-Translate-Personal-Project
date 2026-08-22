@@ -33,6 +33,7 @@ interface Job {
   filename: string;
   mode: Mode;
   selected_page: number | null;
+  translate_titles: boolean;
   total_pages: number;
   status: JobStatus;
   completed_pages: number;
@@ -95,6 +96,7 @@ function App() {
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [mode, setMode] = useState<Mode>("full");
+  const [translateTitles, setTranslateTitles] = useState(false);
   const [pageNumber, setPageNumber] = useState(1);
   const [pageInput, setPageInput] = useState("1");
   const [scale, setScale] = useState(0.85);
@@ -175,6 +177,7 @@ function App() {
     const data = new FormData();
     data.append("file", file);
     data.append("mode", mode);
+    data.append("translate_titles", String(translateTitles));
     if (mode === "page") data.append("page_number", String(requestedPage));
 
     try {
@@ -195,6 +198,7 @@ function App() {
     setPageCount(0);
     setPageNumber(1);
     setPageInput("1");
+    setTranslateTitles(false);
     setUploadError(null);
     setJob(null);
     setMobileView("original");
@@ -287,6 +291,11 @@ function App() {
           </div>
 
           {mode === "page" && <label className="page-picker" htmlFor="page-number"><span>Trang cần dịch</span><span className="page-input-wrap"><input id="page-number" type="number" min="1" max={pageCount || undefined} value={pageInput} onChange={(event) => { const next = event.target.value; setPageInput(next); const numericPage = Number(next); if (Number.isInteger(numericPage) && numericPage >= 1 && (!pageCount || numericPage <= pageCount)) updatePage(numericPage); }} onBlur={normalizePageInput} disabled={!file || controlsLocked} /><span>/ {pageCount || "?"}</span></span></label>}
+
+          <label className="translation-option">
+            <span><strong>Dịch tiêu đề mục</strong><small>Giữ nguyên theo mặc định</small></span>
+            <input type="checkbox" checked={translateTitles} onChange={(event) => setTranslateTitles(event.target.checked)} disabled={!file || controlsLocked} />
+          </label>
 
           {uploadError && <p className="error-text" role="alert"><XCircle size={16} />{uploadError}</p>}
           {job?.status === "failed" && <p className="error-text" role="alert"><XCircle size={16} />{job.error || "Không thể hoàn tất bản dịch."}</p>}

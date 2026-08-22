@@ -26,7 +26,10 @@ from pp_doclayout.utils.server_health import check_server_health
 JobStatus = Literal["queued", "parsing", "translating", "rendering", "completed", "failed"]
 JobMode = Literal["full", "page"]
 ParseOperation = Callable[[Path, Path], Path]
-TranslateOperation = Callable[[Path, Path, ProgressCallback, Callable[[], None]], Path]
+TranslateOperation = Callable[
+    [Path, Path, ProgressCallback, Callable[[], None], bool],
+    Path,
+]
 
 
 @dataclass
@@ -35,6 +38,7 @@ class DemoJob:
     filename: str
     mode: JobMode
     selected_page: int | None
+    translate_titles: bool
     total_pages: int
     job_dir: Path
     source_path: Path
@@ -51,6 +55,7 @@ class DemoJobResponse(BaseModel):
     filename: str
     mode: JobMode
     selected_page: int | None
+    translate_titles: bool
     total_pages: int
     status: JobStatus
     completed_pages: int
@@ -72,6 +77,7 @@ def _default_translate_operation(
     translated_pdf_path: Path,
     progress_callback: ProgressCallback,
     on_before_export: Callable[[], None],
+    translate_titles: bool,
 ) -> Path:
     health = check_server_health("TranslateGemma", settings.vllm_base_url)
     if not health.available:
@@ -81,6 +87,7 @@ def _default_translate_operation(
         project_dir,
         get_gemma(),
         export_formats=("html", "pdf"),
+        translate_titles=translate_titles,
         on_page_translated=progress_callback,
         on_before_export=on_before_export,
     )
@@ -184,6 +191,7 @@ def create_app(
             filename=job.filename,
             mode=job.mode,
             selected_page=job.selected_page,
+            translate_titles=job.translate_titles,
             total_pages=job.total_pages,
             status=job.status,
             completed_pages=job.completed_pages,
@@ -241,6 +249,7 @@ def create_app(
                     job.translated_pdf_path,
                     report_progress,
                     lambda: update_job(job_id, status="rendering"),
+                    job.translate_titles,
                 )
             except Exception as error:  # Keep one failed demo job from killing the worker.
                 update_job(job_id, status="failed", error=str(error))
@@ -291,6 +300,7 @@ def create_app(
         file: UploadFile = File(...),
         mode: str = Form("full"),
         page_number: int | None = Form(None),
+        translate_titles: bool = Form(False),
     ) -> DemoJobResponse:
         filename = Path(file.filename or "document.pdf").name
         if Path(filename).suffix.lower() != ".pdf":
@@ -339,6 +349,7 @@ def create_app(
                 filename=filename,
                 mode=mode,
                 selected_page=selected_page,
+                translate_titles=translate_titles,
                 total_pages=total_pages,
                 job_dir=job_dir,
                 source_path=source_path,

@@ -50,6 +50,7 @@ def translate_and_export_project(
     *,
     output_suffix: str = "translated",
     export_formats: Iterable[str] = ("html", "pdf"),
+    translate_titles: bool = False,
     on_page_translated: ProgressCallback | None = None,
     on_before_export: ExportCallback | None = None,
 ) -> list[Path]:
@@ -61,7 +62,11 @@ def translate_and_export_project(
     imgs_dir = project_dir / "imgs"
 
     for completed_pages, page in enumerate(project_data["pages"], start=1):
-        translated_page = translate_page_data(page, translator)
+        translated_page = translate_page_data(
+            page,
+            translator,
+            translate_titles=translate_titles,
+        )
         translated_page["html_content"] = render_page_blocks(
             translated_page,
             imgs_dir,

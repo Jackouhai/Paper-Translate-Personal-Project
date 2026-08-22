@@ -85,6 +85,13 @@ If PaddlePaddle verification fails, fix Paddle/CUDA before running `parse` or `r
 The default command exports both `output/paper/translated_paper.html` and
 `output/paper/translated_paper.pdf`.
 
+Section titles (`paragraph_title`) remain in their source language by default.
+Enable their translation explicitly when needed:
+
+```bash
+uv run -m pp_doclayout.cli run paper.pdf --translate-titles
+```
+
 PDF export uses Playwright-managed Chromium by default. To use a
 system-installed browser instead, set a Playwright browser channel in `.env`:
 
@@ -150,6 +157,7 @@ docker compose up -d paddle-ocr-vl translate-gemma parse-api web-api web-fronten
 The left column uploads a PDF and selects all pages or one page. The source PDF
 appears in the middle immediately; after translation, the translated PDF is
 shown in the right column. The shared zoom control applies to both documents.
+The "Dịch tiêu đề mục" switch is off by default and matches the CLI option.
 
 The parse stage is serialized to keep the DocLayout model stable. Locally, up
 to five completed parse jobs can enter translation concurrently; each job sends

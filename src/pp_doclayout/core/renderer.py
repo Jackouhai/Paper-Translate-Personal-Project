@@ -50,6 +50,17 @@ def escape_inner_html(content: str) -> str:
     return f"{start_tag}{inner_escaped}{end_tag}"
 
 
+def normalize_title_content(content: str) -> str:
+    """Remove Markdown wrappers that are redundant inside HTML heading tags."""
+    content = re.sub(r"^#{1,6}\s+", "", content.strip())
+    for marker in ("**", "__"):
+        if content.startswith(marker) and content.endswith(marker):
+            inner = content[len(marker):-len(marker)].strip()
+            if inner:
+                return inner
+    return content
+
+
 def build_block(b: dict, imgs_dir: Path, output_dir: Path) -> str:
     """Build a single block div with absolute positioning.
 
@@ -79,7 +90,7 @@ def build_block(b: dict, imgs_dir: Path, output_dir: Path) -> str:
     inner = ""
 
     if label in TITLE_LABELS:
-        content = content.strip("#").strip()
+        content = normalize_title_content(content)
 
     if label in FOOTNOTE_LABELS:
         inner = content
@@ -186,7 +197,12 @@ def build_project_data(project_dir: Path) -> ProjectData:
     return {"pages": pages, "project_name": project_name}
 
 
-def translate_page_data(page: PageData, translator: "BaseTranslator") -> PageData:
+def translate_page_data(
+    page: PageData,
+    translator: "BaseTranslator",
+    *,
+    translate_titles: bool = False,
+) -> PageData:
     """Translate blocks in a page using batch translation.
 
     Args:
@@ -204,7 +220,11 @@ def translate_page_data(page: PageData, translator: "BaseTranslator") -> PageDat
         label = block["block_label"]
         content = block["block_content"].strip()
 
-        action = should_translate(label, content)
+        action = should_translate(
+            label,
+            content,
+            translate_titles=translate_titles,
+        )
         if action == "translate":
             # Handle prefix preservation (e.g., "Abstract")
             prefix = ""
