@@ -1,0 +1,46 @@
+{
+  "file_name": "paper_1_example",
+  "pages": [
+    {
+      "page_index": 1,
+      "blocks": [
+        {
+          "id": "0",
+          "order": "1",
+          "bounding_box": {
+            "x": 0.09967320261437908,
+            "y": 0.09974747474747475,
+            "width": 0.8006535947712419,
+            "height": 0.050505050505050504
+          },
+          "block_content": "Sample OCR Evaluation",
+          "label": "Text"
+        },
+        {
+          "id": "1",
+          "order": "2",
+          "bounding_box": {
+            "x": 0.25,
+            "y": 0.20012626262626262,
+            "width": 0.5,
+            "height": 0.04987373737373737
+          },
+          "block_content": "E = mc^2",
+          "label": "Formula"
+        },
+        {
+          "id": "2",
+          "order": "3",
+          "bounding_box": {
+            "x": 0.1503267973856209,
+            "y": 0.29987373737373735,
+            "width": 0.6993464052287581,
+            "height": 0.15025252525252525
+          },
+          "block_content": "<table><tr><td>Model</td><td>Accuracy</td></tr><tr><td>Baseline</td><td>95%</td></tr></table>",
+          "label": "Table"
+        }
+      ]
+    }
+  ]
+}
