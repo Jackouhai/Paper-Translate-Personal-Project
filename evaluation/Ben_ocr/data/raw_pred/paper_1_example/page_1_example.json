@@ -1,0 +1,28 @@
+{
+  "page_index": 0,
+  "width": 1224,
+  "height": 1584,
+  "parsing_res_list": [
+    {
+      "block_id": 0,
+      "block_order": 1,
+      "block_label": "doc_title",
+      "block_content": "Sample OCR Evaluation",
+      "block_bbox": [122, 158, 1102, 238]
+    },
+    {
+      "block_id": 1,
+      "block_order": 2,
+      "block_label": "formula",
+      "block_content": "E = mc^2",
+      "block_bbox": [306, 317, 918, 396]
+    },
+    {
+      "block_id": 2,
+      "block_order": 3,
+      "block_label": "table",
+      "block_content": "<table><tr><th>Model</th><th>Accuracy</th></tr><tr><td>Baseline</td><td>95%</td></tr></table>",
+      "block_bbox": [184, 475, 1040, 713]
+    }
+  ]
+}
