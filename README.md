@@ -159,12 +159,12 @@ appears in the middle immediately; after translation, the translated PDF is
 shown in the right column. The shared zoom control applies to both documents.
 The "Dịch tiêu đề mục" switch is off by default and matches the CLI option.
 
-The parse stage is serialized to keep the DocLayout model stable. Locally, up
-to five completed parse jobs can enter translation concurrently; each job sends
-up to four requests to the TranslateGemma server. Set
+The parse stage is serialized to keep the DocLayout model stable. By default,
+one job translates at a time and sends at most four requests to TranslateGemma;
+this is the configuration selected from the real-workload benchmark. Set
 `WEB_DEMO_TRANSLATION_WORKERS` and `WEB_DEMO_MAX_CONCURRENT_REQUESTS` in the
-Compose environment to tune those limits. The supplied VPS profile uses one
-translation worker.
+Compose environment to tune these limits, but their product should not exceed
+four for a single GPU.
 
 For a short public demonstration, start the optional Cloudflare Quick Tunnel:
 
@@ -353,6 +353,43 @@ The pipeline uses 2 models, each on a separate vLLM server:
 curl http://127.0.0.1:8000/v1/models
 curl http://127.0.0.1:8001/v1/models
 ```
+
+### Benchmark with real PDF blocks
+
+Create JSONL from the blocks the pipeline actually translates. The script uses
+the same translation policy, `<<<custom>>>` prompt, and output limit as
+`GemmaTranslator`.
+
+```bash
+uv run scripts/build_translation_benchmark_dataset.py \
+  output/PhoMT output/2306.00978v6 \
+  --output bench_data/translation_blocks.jsonl \
+  --max-samples 100
+```
+
+With the TranslateGemma server running, benchmark it from the vLLM environment:
+
+```bash
+cd services/llm-server
+UV_CACHE_DIR="$PWD/.uv-cache" uv run --no-sync vllm bench serve \
+  --backend openai \
+  --base-url http://127.0.0.1:8001 \
+  --endpoint /v1/completions \
+  --model Infomaniak-AI/vllm-translategemma-4b-it \
+  --dataset-name custom \
+  --dataset-path ../../bench_data/translation_blocks.jsonl \
+  --no-oversample \
+  --num-prompts 100 \
+  --max-concurrency 4 \
+  --num-warmups 3 \
+  --temperature 0 \
+  --save-result --save-detailed \
+  --result-dir ../../logs/vllm-bench-real
+```
+
+Do not use `--skip-chat-template`: the benchmark must wrap the user content
+with TranslateGemma's template. Do not use `--ignore-eos`: the model should
+finish each translation naturally, as it does in the pipeline.
 
 ## Translation Policy
 

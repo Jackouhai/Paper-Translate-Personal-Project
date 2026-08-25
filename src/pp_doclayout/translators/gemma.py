@@ -57,15 +57,20 @@ class GemmaTranslator(BaseTranslator):
 
         return (available_output_tokens)
 
-    def translate(
-        self, text: str, source_lang: str = "en", target_lang: str = "vi"
-    ) -> str:
-        if not text or not text.strip():
-            return ""
+    def get_max_tokens_for_text(self, text: str) -> int:
+        """Return the generation limit used for a source translation block."""
+        return self._get_max_tokens_for_text(text)
 
+    @staticmethod
+    def build_translation_prompt(
+        text: str,
+        source_lang: str = "en",
+        target_lang: str = "vi",
+    ) -> str:
+        """Build the custom prompt expected by the TranslateGemma template."""
         source_language = _LANGUAGE_NAMES.get(source_lang, source_lang)
         target_language = _LANGUAGE_NAMES.get(target_lang, target_lang)
-        translation_prompt = (
+        return (
             f"You are a professional {source_language} ({source_lang}) to "
             f"{target_language} ({target_lang}) translator research paper. Your goal is to "
             f"accurately convey the meaning and nuances of the original "
@@ -75,6 +80,18 @@ class GemmaTranslator(BaseTranslator):
             f"{target_language} translation, without any additional explanations "
             f"or commentary. Please translate the following {source_language} "
             f"text into {target_language}:\n\n{text}"
+        )
+
+    def translate(
+        self, text: str, source_lang: str = "en", target_lang: str = "vi"
+    ) -> str:
+        if not text or not text.strip():
+            return ""
+
+        translation_prompt = self.build_translation_prompt(
+            text,
+            source_lang=source_lang,
+            target_lang=target_lang,
         )
 
         messages = [

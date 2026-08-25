@@ -69,8 +69,8 @@ class PageData(TypedDict):
     height: int
     model_settings: ModelSettings
     parsing_res_list: list[Block]
-    # layout_det_res is optional, may be present or not
     layout_det_res: NotRequired[dict]
+    html_content: NotRequired[str]
 
 
 class ProjectData(TypedDict):
