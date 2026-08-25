@@ -25,6 +25,9 @@ AGENTS.md
 # Other untracked
 pdf/
 logs/
+bench_data/
+.streamlit_temp/
+.local/
 
 # Frontend build dependencies
 frontend_demo/node_modules/

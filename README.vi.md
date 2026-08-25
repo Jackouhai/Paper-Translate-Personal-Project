@@ -158,11 +158,11 @@ hiện ngay ở cột giữa; sau khi dịch xong, PDF dịch hiện ở cột p
 zoom dùng chung cho cả hai tài liệu.
 Nút "Dịch tiêu đề mục" mặc định tắt và tương ứng với option CLI ở trên.
 
-Bước parse chạy tuần tự để model DocLayout ổn định. Trên cấu hình local, tối
-đa năm job parse xong có thể vào bước dịch đồng thời; mỗi job gửi tối đa bốn
-request đến TranslateGemma. Có thể chỉnh `WEB_DEMO_TRANSLATION_WORKERS` và
-`WEB_DEMO_MAX_CONCURRENT_REQUESTS` trong môi trường Compose. Profile VPS đi
-kèm chỉ dùng một translation worker.
+Bước parse chạy tuần tự để model DocLayout ổn định. Mặc định chỉ một job được
+dịch tại một thời điểm và job đó gửi tối đa bốn request đến TranslateGemma; đây
+là cấu hình được chọn từ benchmark workload thật. Có thể chỉnh
+`WEB_DEMO_TRANSLATION_WORKERS` và `WEB_DEMO_MAX_CONCURRENT_REQUESTS` trong môi
+trường Compose, nhưng tích của hai giá trị không nên vượt bốn nếu dùng một GPU.
 
 Để mở demo công khai trong thời gian ngắn, khởi động Cloudflare Quick Tunnel:
 
@@ -350,6 +350,42 @@ Pipeline sử dụng 2 mô hình, mỗi mô hình chạy trên 1 vLLM server ri�
 curl http://127.0.0.1:8000/v1/models
 curl http://127.0.0.1:8001/v1/models
 ```
+
+### Benchmark với block PDF thật
+
+Tạo JSONL từ các block mà pipeline thực sự dịch. Script dùng cùng translation
+policy, prompt `<<<custom>>>` và giới hạn output với `GemmaTranslator`.
+
+```bash
+uv run scripts/build_translation_benchmark_dataset.py \
+  output/PhoMT output/2306.00978v6 \
+  --output bench_data/translation_blocks.jsonl \
+  --max-samples 100
+```
+
+Sau khi TranslateGemma server đang chạy, chạy benchmark trong môi trường vLLM:
+
+```bash
+cd services/llm-server
+UV_CACHE_DIR="$PWD/.uv-cache" uv run --no-sync vllm bench serve \
+  --backend openai \
+  --base-url http://127.0.0.1:8001 \
+  --endpoint /v1/completions \
+  --model Infomaniak-AI/vllm-translategemma-4b-it \
+  --dataset-name custom \
+  --dataset-path ../../bench_data/translation_blocks.jsonl \
+  --no-oversample \
+  --num-prompts 100 \
+  --max-concurrency 4 \
+  --num-warmups 3 \
+  --temperature 0 \
+  --save-result --save-detailed \
+  --result-dir ../../logs/vllm-bench-real
+```
+
+Không dùng `--skip-chat-template`: benchmark cần bọc user content bằng template
+của TranslateGemma. Không dùng `--ignore-eos`: model tự kết thúc bản dịch như
+pipeline thật.
 
 ## Translation Policy
 

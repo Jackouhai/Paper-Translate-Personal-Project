@@ -16,7 +16,7 @@ from pp_doclayout.config import settings
 # Server configs
 PADDLE_OCR_PORT = 8000
 GEMMA_PORT = 8001
-PID_FILE = Path(".server_pids.txt")
+PID_FILE = Path(".local/server_pids.txt")
 
 
 class ServerManager:

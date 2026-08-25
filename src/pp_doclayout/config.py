@@ -96,8 +96,8 @@ class Settings(BaseSettings):
 
     # ===== Concurrent Request Settings =====
     max_concurrent_requests: int = Field(
-        default=32,
-        description="Max concurrent translation requests"
+        default=4,
+        description="Max concurrent translation requests sent to TranslateGemma",
     )
 
     # ===== Path Settings =====
